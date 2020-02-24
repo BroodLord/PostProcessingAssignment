@@ -1,11 +1,8 @@
-﻿  Camera.cpp
-  Direct3DSetup.cpp
-  Main.cpp
-  Mesh.cpp
-  Model.cpp
-  Scene.cpp
-  Shader.cpp
-  State.cpp
-  GraphicsHelpers.cpp
-  Generating Code...
-  PostProcessingArea.vcxproj -> D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe
+﻿C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.hlsl(97,35-80): warning X4008: floating point division by zero
+C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.hlsl(97,35-80): warning X4008: floating point division by zero
+C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.hlsl(97,35-80): warning X4008: floating point division by zero
+C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.hlsl(97,35-80): warning X4008: floating point division by zero
+C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.hlsl(97,35-80): warning X4008: floating point division by zero
+  
+  compilation object save succeeded; see C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\TintHue.cso
+  PostProcessingArea.vcxproj -> C:\Users\danny\OneDrive\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe

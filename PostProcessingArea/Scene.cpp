@@ -51,111 +51,7 @@ enum class PostProcess
 };
 
 
-struct ConversionsRGB_HSL
-{
-	static float Min(float a, float b) {
-		return a <= b ? a : b;
-	}
 
-	static float Max(float a, float b) {
-		return a >= b ? a : b;
-	}
-
-	static float HueToRGB(float v1, float v2, float vH) {
-		if (vH < 0)
-			vH += 1;
-
-		if (vH > 1)
-			vH -= 1;
-
-		if ((6 * vH) < 1)
-			return (v1 + (v2 - v1) * 6 * vH);
-
-		if ((2 * vH) < 1)
-			return v2;
-
-		if ((3 * vH) < 2)
-			return (v1 + (v2 - v1) * ((2.0f / 3) - vH) * 6);
-
-		return v1;
-	}
-
-	static void HSLToRGB(float& h, float& s, float& l) {
-		float r = 0;
-		float g = 0;
-		float b = 0;
-
-		if (s == 0)
-		{
-			r = g = b = (unsigned char)(l * 255);
-		}
-		else
-		{
-			float v1, v2;
-			float hue = (float)h / 360;
-
-			v2 = (l < 0.5) ? (l * (1 + s)) : ((l + s) - (l * s));
-			v1 = 2 * l - v2;
-
-			r = (float)(255 * HueToRGB(v1, v2, hue + (1.0f / 3)));
-			g = (float)(255 * HueToRGB(v1, v2, hue));
-			b = (float)(255 * HueToRGB(v1, v2, hue - (1.0f / 3)));
-		}
-
-		h = r;
-		s = g;
-		l = b;
-	}
-
-	static void RGBToHSL(float& r, float& g, float& b) {
-		CVector3 hsl = CVector3(0.0f, 0.0f, 0.0f);
-
-		r /= 255.0f;
-		g /= 255.0f;
-		b /= 255.0f;
-
-		float min = Min(Min(r, g), b);
-		float max = Max(Max(r, g), b);
-		float delta = max - min;
-
-		hsl.z = (max + min) / 2;
-
-		if (delta == 0)
-		{
-			hsl.x = 0;
-			hsl.y = 0.0f;
-		}
-		else
-		{
-			hsl.y = (hsl.z <= 0.5) ? (delta / (max + min)) : (delta / (2 - max - min));
-
-			float hue;
-
-			if (r == max)
-			{
-				hue = ((g - b) / 6) / delta;
-			}
-			else if (g == max)
-			{
-				hue = (1.0f / 3) + ((b - r) / 6) / delta;
-			}
-			else
-			{
-				hue = (2.0f / 3) + ((r - g) / 6) / delta;
-			}
-
-			if (hue < 0)
-				hue += 1;
-			if (hue > 1)
-				hue -= 1;
-
-			hsl.x = (float)(hue * 360);
-		}
-		r = hsl.x;
-		g = hsl.y;
-		b = hsl.z;
-	}
-};
 
 struct PostProcessData
 {
@@ -739,11 +635,7 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 
 	else if (postProcess == PostProcess::TintHue)
 	{
-		ConversionsRGB_HSL Conversion;
-		Conversion.RGBToHSL(PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2]);
-		Conversion.RGBToHSL(PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2]);
-		Conversion.HSLToRGB(PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2]);
-		Conversion.HSLToRGB(PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2]);
+		
 		gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2] };
 		gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2] };
 		gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
@@ -932,11 +824,7 @@ void FullScreenPostProcess(PostProcess postProcess)
 
 		else if (PostProcessingVector[i] == PostProcess::TintHue)
 		{
-			ConversionsRGB_HSL Conversion;
-			Conversion.RGBToHSL(PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2]);
-			Conversion.RGBToHSL(PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2]);
-			Conversion.HSLToRGB(PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2]);
-			Conversion.HSLToRGB(PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2]);
+			
 			gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2] };
 			gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2] };
 			gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
