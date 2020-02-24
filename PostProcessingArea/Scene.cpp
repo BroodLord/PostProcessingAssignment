@@ -40,6 +40,7 @@ enum class PostProcess
 	None,
 	Copy,
 	Tint,
+	TintHue,
 	GreyNoise,
 	Burn,
 	Distort,
@@ -47,6 +48,113 @@ enum class PostProcess
 	Blur,
 	Underwater,
 	HeatHaze,
+};
+
+
+struct ConversionsRGB_HSL
+{
+	static float Min(float a, float b) {
+		return a <= b ? a : b;
+	}
+
+	static float Max(float a, float b) {
+		return a >= b ? a : b;
+	}
+
+	static float HueToRGB(float v1, float v2, float vH) {
+		if (vH < 0)
+			vH += 1;
+
+		if (vH > 1)
+			vH -= 1;
+
+		if ((6 * vH) < 1)
+			return (v1 + (v2 - v1) * 6 * vH);
+
+		if ((2 * vH) < 1)
+			return v2;
+
+		if ((3 * vH) < 2)
+			return (v1 + (v2 - v1) * ((2.0f / 3) - vH) * 6);
+
+		return v1;
+	}
+
+	static void HSLToRGB(float& h, float& s, float& l) {
+		float r = 0;
+		float g = 0;
+		float b = 0;
+
+		if (s == 0)
+		{
+			r = g = b = (unsigned char)(l * 255);
+		}
+		else
+		{
+			float v1, v2;
+			float hue = (float)h / 360;
+
+			v2 = (l < 0.5) ? (l * (1 + s)) : ((l + s) - (l * s));
+			v1 = 2 * l - v2;
+
+			r = (float)(255 * HueToRGB(v1, v2, hue + (1.0f / 3)));
+			g = (float)(255 * HueToRGB(v1, v2, hue));
+			b = (float)(255 * HueToRGB(v1, v2, hue - (1.0f / 3)));
+		}
+
+		h = r;
+		s = g;
+		l = b;
+	}
+
+	static void RGBToHSL(float& r, float& g, float& b) {
+		CVector3 hsl = CVector3(0.0f, 0.0f, 0.0f);
+
+		r /= 255.0f;
+		g /= 255.0f;
+		b /= 255.0f;
+
+		float min = Min(Min(r, g), b);
+		float max = Max(Max(r, g), b);
+		float delta = max - min;
+
+		hsl.z = (max + min) / 2;
+
+		if (delta == 0)
+		{
+			hsl.x = 0;
+			hsl.y = 0.0f;
+		}
+		else
+		{
+			hsl.y = (hsl.z <= 0.5) ? (delta / (max + min)) : (delta / (2 - max - min));
+
+			float hue;
+
+			if (r == max)
+			{
+				hue = ((g - b) / 6) / delta;
+			}
+			else if (g == max)
+			{
+				hue = (1.0f / 3) + ((b - r) / 6) / delta;
+			}
+			else
+			{
+				hue = (2.0f / 3) + ((r - g) / 6) / delta;
+			}
+
+			if (hue < 0)
+				hue += 1;
+			if (hue > 1)
+				hue -= 1;
+
+			hsl.x = (float)(hue * 360);
+		}
+		r = hsl.x;
+		g = hsl.y;
+		b = hsl.z;
+	}
 };
 
 struct PostProcessData
@@ -58,7 +166,29 @@ struct PostProcessData
 			float rgbTop[3];
 			float rgbMid[3];
 			float padding; // As the GPU only allows padding of 4,8,16, not 12
+			void tint(float Top[], float Mid[])
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					rgbTop[i] = Top[i];
+					rgbMid[i] = Mid[i];
+				}
+			}
 		}tint;
+		struct
+		{
+			float Hue1[3];
+			float Hue2[3];
+			float padding; // As the GPU only allows padding of 4,8,16, not 12
+			void Hue(float Top[], float Mid[])
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					Hue1[i] = Top[i];
+					Hue2[i] = Mid[i];
+				}
+			}
+		}Hue;
 		struct
 		{
 			float grainSize;
@@ -73,23 +203,19 @@ struct PostProcessData
 		}Burn;
 		struct
 		{
+			int blur;
+			float padding; // As the GPU only allows padding of 4,8,16, not 12
+			void Blur(int B)
+			{
+				blur = B;
+			}
+
+		}Blur;
+		struct
+		{
 			float waterSpeed;
-			float waterWiggle;
-			float waterLevel;
 			float padding; // As the GPU only allows padding of 4,8,16, not 12
 		}Water;
-		struct
-		{
-			float spiralLevel;
-			float spiralWiggle;
-			float spiralSpeed;
-			float padding; // As the GPU only allows padding of 4,8,16, not 12
-		}Spiral;
-		struct
-		{
-			float HeatHazeTimer;
-			float padding; // As the GPU only allows padding of 4,8,16, not 12
-		}HeatHaze;
 
 	};
 };
@@ -98,13 +224,15 @@ const char* PPNames[] = {
 	"None",
 	"Copy",
 	"Tint",
+	"TintHue",
 	"GreyNoise",
 	"Burn",
 	"Distort",
 	"Spiral",
 	"Blur",
 	"Underwater",
-	"HeatHaze" 
+	"HeatHaze"
+
 };
 
 enum class PostProcessMode
@@ -119,7 +247,6 @@ auto gCurrentPostProcess = PostProcess::None;
 auto gCurrentPostProcessMode = PostProcessMode::Fullscreen;
 std::vector<PostProcess> PostProcessingVector;
 std::vector<PostProcessData> PostProcessingDataVector;
-std::vector<PostProcess> TempVector;
 //********************
 
 
@@ -160,6 +287,7 @@ Light gLights[NUM_LIGHTS];
 
 static int Counter = 0;
 static float burnSpeed = 2.0f;
+static float WaterSpeed = 1.0f;
 
 // Additional light information
 CVector3 gAmbientColour = { 0.3f, 0.3f, 0.4f }; // Background level of light (slightly bluish to match the far background, which is dark blue)
@@ -583,30 +711,50 @@ void RenderSceneFromCamera(Camera* camera)
 void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 {
 
+
+	// Prepare custom settings for current post-process
 	if (postProcess == PostProcess::Copy)
 	{
 		gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
 	}
 
-	else if (gCurrentPostProcess == PostProcess::Blur)
+	else if (postProcess == PostProcess::Blur)
 	{
 		gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
 	}
-	else if (gCurrentPostProcess == PostProcess::Underwater)
+	else if (postProcess == PostProcess::Underwater)
 	{
+		WaterSpeed = PostProcessingDataVector[Counter].Water.waterSpeed;
 		gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
 
 	}
 
 	else if (postProcess == PostProcess::Tint)
 	{
+
+		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[Counter].tint.rgbTop[0] ,PostProcessingDataVector[Counter].tint.rgbTop[1] ,PostProcessingDataVector[Counter].tint.rgbTop[2] };
+		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[Counter].tint.rgbMid[0] ,PostProcessingDataVector[Counter].tint.rgbMid[1] ,PostProcessingDataVector[Counter].tint.rgbMid[2] };
 		gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
+	}
+
+	else if (postProcess == PostProcess::TintHue)
+	{
+		ConversionsRGB_HSL Conversion;
+		Conversion.RGBToHSL(PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2]);
+		Conversion.RGBToHSL(PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2]);
+		Conversion.HSLToRGB(PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2]);
+		Conversion.HSLToRGB(PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2]);
+		gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2] };
+		gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2] };
+		gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
 	}
 
 	else if (postProcess == PostProcess::GreyNoise)
 	{
 		gD3DContext->PSSetShader(gGreyNoisePostProcess, nullptr, 0);
-
+		float grainSize; // Fineness of the noise grain
+		grainSize = PostProcessingDataVector[Counter].Noise.grainSize;
+		gPostProcessingConstants.noiseScale = { gViewportWidth / grainSize, gViewportHeight / grainSize };
 		// Give pixel shader access to the noise texture
 		gD3DContext->PSSetShaderResources(1, 1, &gNoiseMapSRV);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
@@ -614,8 +762,10 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 
 	else if (postProcess == PostProcess::Burn)
 	{
+
 		gD3DContext->PSSetShader(gBurnPostProcess, nullptr, 0);
 
+		burnSpeed = PostProcessingDataVector[Counter].Burn.burnSpeed;
 		// Give pixel shader access to the burn texture (basically a height map that the burn level ascends)
 		gD3DContext->PSSetShaderResources(1, 1, &gBurnMapSRV);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
@@ -639,135 +789,10 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	{
 		gD3DContext->PSSetShader(gHeatHazePostProcess, nullptr, 0);
 	}
+	UpdateConstantBuffer(gPostProcessingConstantBuffer, gPostProcessingConstants);
+
 }
 
-void PingPongProcess()
-{
-	//TempVector = PostProcessingVector;
-
-
-
-	for (int i = 0; i < PostProcessingVector.size(); i++)
-	{
-		// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
-		ID3D11ShaderResourceView* nullSRV = nullptr;
-		gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
-		if (i % 2 == 0)
-		{
-			// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
-			gD3DContext->OMSetRenderTargets(1, &gBackRenderTarget, gDepthStencil);
-
-
-			// Give the pixel shader (post-processing shader) access to the scene texture 
-			gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-			gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-
-		}
-		else
-		{
-			// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
-			gD3DContext->OMSetRenderTargets(1, &gSceneRenderTarget, gDepthStencil);
-
-			// Give the pixel shader (post-processing shader) access to the scene texture 
-			gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-			gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-		}
-
-		if (PostProcessingVector[i] == PostProcess::Copy)
-		{
-			gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::Blur)
-		{
-			gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
-		}
-		else if (PostProcessingVector[i] == PostProcess::Underwater)
-		{
-			gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
-
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::Tint)
-		{
-			gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::GreyNoise)
-		{
-			gD3DContext->PSSetShader(gGreyNoisePostProcess, nullptr, 0);
-
-			// Give pixel shader access to the noise texture
-			gD3DContext->PSSetShaderResources(1, 1, &gNoiseMapSRV);
-			gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::Burn)
-		{
-			gD3DContext->PSSetShader(gBurnPostProcess, nullptr, 0);
-
-			// Give pixel shader access to the burn texture (basically a height map that the burn level ascends)
-			gD3DContext->PSSetShaderResources(1, 1, &gBurnMapSRV);
-			gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::Distort)
-		{
-			gD3DContext->PSSetShader(gDistortPostProcess, nullptr, 0);
-
-			// Give pixel shader access to the distortion texture (containts 2D vectors (in R & G) to shift the texture UVs to give a cut-glass impression)
-			gD3DContext->PSSetShaderResources(1, 1, &gDistortMapSRV);
-			gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::Spiral)
-		{
-			gD3DContext->PSSetShader(gSpiralPostProcess, nullptr, 0);
-		}
-
-		else if (PostProcessingVector[i] == PostProcess::HeatHaze)
-		{
-			gD3DContext->PSSetShader(gHeatHazePostProcess, nullptr, 0);
-		}
-
-		UpdateConstantBuffer(gPostProcessingConstantBuffer, gPostProcessingConstants);
-		gD3DContext->PSSetConstantBuffers(1, 1, &gPostProcessingConstantBuffer);
-		//
-		//// Draw a quad
-		gD3DContext->Draw(4, 0);
-	}
-
-	ID3D11ShaderResourceView* nullSRV = nullptr;
-	gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
-	gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
-	gD3DContext->ClearRenderTargetView(gBackBufferRenderTarget, &gBackgroundColor.r);
-
-
-	if (PostProcessingVector.size() % 2 == 0)
-	{
-
-		// Give the pixel shader (post-processing shader) access to the scene texture 
-		gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-
-	}
-	else
-	{
-		// Give the pixel shader (post-processing shader) access to the scene texture 
-		gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	}
-
-
-
-
-	gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
-
-
-
-	// Draw a quad
-	gD3DContext->Draw(4, 0);
-}
 
 
 // Perform a full-screen post process from "scene texture" to back buffer
@@ -817,6 +842,13 @@ void FullScreenPostProcess(PostProcess postProcess)
 	//
 	//// Draw a quad
 	//gD3DContext->Draw(4, 0);
+
+	gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
+	
+	
+	// Give the pixel shader (post-processing shader) access to the scene texture 
+	gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV);
+	gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
 
 	// Using special vertex shader than creates its own data for a full screen quad
 	gD3DContext->VSSetShader(g2DQuadVertexShader, nullptr, 0);
@@ -880,19 +912,34 @@ void FullScreenPostProcess(PostProcess postProcess)
 
 		else if (PostProcessingVector[i] == PostProcess::Blur)
 		{
+			gPostProcessingConstants.blurStrength = PostProcessingDataVector[i].Blur.blur;
 			gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
 		}
 		else if (PostProcessingVector[i] == PostProcess::Underwater)
 		{
+			WaterSpeed = PostProcessingDataVector[i].Water.waterSpeed;
 			gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
 
 		}
 
 		else if (PostProcessingVector[i] == PostProcess::Tint)
 		{
+
 			gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[i].tint.rgbTop[0] ,PostProcessingDataVector[i].tint.rgbTop[1] ,PostProcessingDataVector[i].tint.rgbTop[2] };
 			gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[i].tint.rgbMid[0] ,PostProcessingDataVector[i].tint.rgbMid[1] ,PostProcessingDataVector[i].tint.rgbMid[2] };
 			gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
+		}
+
+		else if (PostProcessingVector[i] == PostProcess::TintHue)
+		{
+			ConversionsRGB_HSL Conversion;
+			Conversion.RGBToHSL(PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2]);
+			Conversion.RGBToHSL(PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2]);
+			Conversion.HSLToRGB(PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2]);
+			Conversion.HSLToRGB(PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2]);
+			gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2] };
+			gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2] };
+			gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
 		}
 
 		else if (PostProcessingVector[i] == PostProcess::GreyNoise)
@@ -908,7 +955,7 @@ void FullScreenPostProcess(PostProcess postProcess)
 
 		else if (PostProcessingVector[i] == PostProcess::Burn)
 		{
-			
+
 			gD3DContext->PSSetShader(gBurnPostProcess, nullptr, 0);
 
 			burnSpeed = PostProcessingDataVector[i].Burn.burnSpeed;
@@ -979,16 +1026,16 @@ void FullScreenPostProcess(PostProcess postProcess)
 // Perform an area post process from "scene texture" to back buffer at a given point in the world, with a given size (world units)
 void AreaPostProcess(PostProcess postProcess, CVector3 worldPoint, CVector2 areaSize, float ZShift)
 {
-	// First perform a full-screen copy of the scene to back-buffer
+	//// First perform a full-screen copy of the scene to back-buffer
 	FullScreenPostProcess(PostProcess::Copy);
-
-	// Now perform a post-process of a portion of the scene to the back-buffer (overwriting some of the copy above)
-	// Note: The following code relies on many of the settings that were prepared in the FullScreenPostProcess call above, it only
-	//       updates a few things that need to be changed for an area process. If you tinker with the code structure you need to be
-	//       aware of all the work that the above function did that was also preparation for this post-process area step
-
-	// Select shader/textures needed for required post-process
-	//SelectPostProcessShaderAndTextures(postProcess);
+	//
+	//// Now perform a post-process of a portion of the scene to the back-buffer (overwriting some of the copy above)
+	//// Note: The following code relies on many of the settings that were prepared in the FullScreenPostProcess call above, it only
+	////       updates a few things that need to be changed for an area process. If you tinker with the code structure you need to be
+	////       aware of all the work that the above function did that was also preparation for this post-process area step
+	//
+	//// Select shader/textures needed for required post-process
+	SelectPostProcessShaderAndTextures(postProcess);
 
 	// Enable alpha blending - area effects need to fade out at the edges or the hard edge of the area is visible
 	// A couple of the shaders have been updated to put the effect into a soft circle
@@ -1152,38 +1199,36 @@ void RenderScene()
 	// Run any post-processing steps
 	if (PostProcessingVector.size() != 0)
 	{
-//for (int i = 0; i < PostProcessingVector.size(); i++)
-//{
 
-if (gCurrentPostProcessMode == PostProcessMode::Fullscreen)
-{
-	FullScreenPostProcess(gCurrentPostProcess);
-}
+		if (gCurrentPostProcessMode == PostProcessMode::Fullscreen)
+		{
+			FullScreenPostProcess(gCurrentPostProcess);
+		}
 
-else if (gCurrentPostProcessMode == PostProcessMode::Area)
-{
-	// Pass a 3D point for the centre of the affected area and the size of the (rectangular) area in world units
-	AreaPostProcess(gCurrentPostProcess, gCube->Position(), { 10, 10 }, 3.2f);
-}
+		else if (gCurrentPostProcessMode == PostProcessMode::Area)
+		{
+			// Pass a 3D point for the centre of the affected area and the size of the (rectangular) area in world units
+			AreaPostProcess(gCurrentPostProcess, gCube->Position(), { 10, 10 }, 3.2f);
+		}
 
-else if (gCurrentPostProcessMode == PostProcessMode::Polygon)
-{
-	// An array of four points in world space - a tapered square centred at the origin
-	const std::array<CVector3, 4> points = { { {-3,5,0}, {-5,-5,0}, {3,5,0}, {5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
+		else if (gCurrentPostProcessMode == PostProcessMode::Polygon)
+		{
+			// An array of four points in world space - a tapered square centred at the origin
+			const std::array<CVector3, 4> points = { { {-3,5,0}, {-5,-5,0}, {3,5,0}, {5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
 
-	// A rotating matrix placing the model above in the scene
-	static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
-	polyMatrix = MatrixRotationY(ToRadians(1)) * polyMatrix;
+			// A rotating matrix placing the model above in the scene
+			static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
+			polyMatrix = MatrixRotationY(ToRadians(1)) * polyMatrix;
 
-	// Pass an array of 4 points and a matrix. Only supports 4 points.
-	PolygonPostProcess(gCurrentPostProcess, points, polyMatrix);
+			// Pass an array of 4 points and a matrix. Only supports 4 points.
+			PolygonPostProcess(gCurrentPostProcess, points, polyMatrix);
 
-}
-//}
+		}
 
-// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
-ID3D11ShaderResourceView* nullSRV = nullptr;
-gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
+
+		// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
+		ID3D11ShaderResourceView* nullSRV = nullptr;
+		gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 	}
 
 	//IMGUI
@@ -1200,19 +1245,35 @@ gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 	{
 		if (ImGui::Button("Tint", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::Tint;
-			PostProcessingDataVector.push_back({ 0.4f, 0.8f, 0.5f});
+			PostProcessData PPD;
+			float tempTop[3] = { 0.3f,0.8f,0.0f };
+			float tempMid[3] = { 0.1f,0.5f,1.0f };;
+			PPD.tint.tint(tempTop, tempMid);
+			PostProcessingDataVector.push_back(PPD);
+			PostProcessingVector.push_back(gCurrentPostProcess);
+		}
+		if (ImGui::Button("TintHue", ImVec2(100, 20)))
+		{
+			gCurrentPostProcess = PostProcess::TintHue;
+			PostProcessData PPD;
+			float tempHue1[3] = { 77.0f,204.0f,0.0f };
+			float tempHue2[3] = { 26.0f,128.0f,255.0f };;
+			PPD.Hue.Hue(tempHue1, tempHue2);
+			PostProcessingDataVector.push_back({ PPD });
 			PostProcessingVector.push_back(gCurrentPostProcess);
 		}
 		if (ImGui::Button("Blur", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Blur;
-			PostProcessingDataVector.push_back({});
+			PostProcessData Blur;
+			Blur.Blur.Blur(5);
+			PostProcessingDataVector.push_back(Blur);
 			PostProcessingVector.push_back(gCurrentPostProcess);
 		}
 		if (ImGui::Button("Burn", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Burn;
-			PostProcessingDataVector.push_back({1.0f});
+			PostProcessingDataVector.push_back({ 1.0f });
 			PostProcessingVector.push_back(gCurrentPostProcess);
 		}
 		if (ImGui::Button("Distort", ImVec2(100, 20)))
@@ -1236,13 +1297,13 @@ gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 		if (ImGui::Button("GreyNoise", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::GreyNoise;
-			PostProcessingDataVector.push_back({});
+			PostProcessingDataVector.push_back({ 140.0f });
 			PostProcessingVector.push_back(gCurrentPostProcess);
 		}
 		if (ImGui::Button("Underwater", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Underwater;
-			PostProcessingDataVector.push_back({});
+			PostProcessingDataVector.push_back({ 1.0f });
 			PostProcessingVector.push_back(gCurrentPostProcess);
 		}
 		//ImGui::SameLine();
@@ -1258,8 +1319,7 @@ gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 	ImGui::Text("Active Postprocessers");
 	for (int i = 0; i < PostProcessingVector.size(); i++)
 	{
-		ImGui::Text(PPNames[(int)PostProcessingVector[i]]);
-		ImGui::SameLine();
+
 		ImGui::PushID(i);
 		if (ImGui::Button("x", ImVec2(15, 20)))
 		{
@@ -1268,15 +1328,35 @@ gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 			ImGui::PopID();
 			break;
 		}
+		ImGui::SameLine();
+		ImGui::Text(PPNames[(int)PostProcessingVector[i]]);
 		if (PPNames[(int)PostProcessingVector[i]] == "Tint")
 		{
 			ImGui::SameLine();
 			if (ImGui::BeginMenu("ColourPicker"))
 			{
-				float tintG0[3] = {0.0f, 0.0f, 0.0f};
+				float tintG0[3] = { 0.0f, 0.0f, 0.0f };
 				ImGui::ColorEdit3("Tint Editor - Gradiant 1", PostProcessingDataVector[i].tint.rgbTop, ImGuiColorEditFlags_PickerHueWheel);
 				float tintG1[3] = { 0.0f, 0.0f, 0.0f };
 				ImGui::ColorEdit3("Tint Editor - Gradiant 2", PostProcessingDataVector[i].tint.rgbMid, ImGuiColorEditFlags_PickerHueWheel);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i]] == "Underwater")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Water Properties"))
+			{
+				ImGui::SliderFloat("WaterSpeed", &PostProcessingDataVector[i].Noise.grainSize, 0.0f, 2.0f);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i]] == "Blur")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Blur Properties"))
+			{
+				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
 				ImGui::EndMenu();
 			}
 		}
@@ -1306,17 +1386,17 @@ gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 
 
 
-		//*******************************
+	//*******************************
 
 
 
-		////--------------- Scene completion ---------------////
+	////--------------- Scene completion ---------------////
 
-		//IMGUI
-		//*******************************
-		// Finalise ImGUI for this frame
-		//*******************************
-		ImGui::Render();
+	//IMGUI
+	//*******************************
+	// Finalise ImGUI for this frame
+	//*******************************
+	ImGui::Render();
 	gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, nullptr);
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -1342,7 +1422,7 @@ void UpdateScene(float frameTime)
 	if (KeyHit(Key_F2))  gCurrentPostProcessMode = PostProcessMode::Area;
 	if (KeyHit(Key_F3))  gCurrentPostProcessMode = PostProcessMode::Polygon;
 
-	
+
 
 	// Post processing settings - all data for post-processes is updated every frame whether in use or not (minimal cost)
 
@@ -1356,16 +1436,14 @@ void UpdateScene(float frameTime)
 	// Set and increase the burn level (cycling back to 0 when it reaches 1.0f)
 	gPostProcessingConstants.burnHeight = fmod(gPostProcessingConstants.burnHeight + (burnSpeed * FrameTime), 1.0f);
 
-	static float WaterWiggle = 0.0f;
-	const float WaterSpeed = 1.0f;
 	gPostProcessingConstants.WaterLevel += WaterSpeed * frameTime;
 
 	// Set the level of distortion
 	gPostProcessingConstants.distortLevel = 0.03f;
 
-	// Set and increase the amount of spiral - use a tweaked cos wave to animate
 	static float wiggle = 0.0f;
-	const float wiggleSpeed = 1.0f;
+	static float wiggleSpeed = 1.0f;
+	// Set and increase the amount of spiral - use a tweaked cos wave to animate
 	gPostProcessingConstants.spiralLevel = ((1.0f - cos(wiggle)) * 4.0f);
 	wiggle += wiggleSpeed * frameTime;
 

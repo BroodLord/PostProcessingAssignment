@@ -33,14 +33,14 @@ float4 main(PostProcessingInput input) : SV_Target
    float3 tc = float3(0.0, 0.0, 0.0);
     float3 ppColour = SceneTexture.Sample(PointSample, input.sceneUV) * weight[0];
     
-    float rt_w = 1 / gViewportHeight * 5; // render target width
-    float rt_h = 1 / gViewportWidth * 5; // render target height
+    float rt_w = 1 / gViewportHeight * gblurStrength; // render target width
+    float rt_h = 1 / gViewportWidth * gblurStrength; // render target height
    
        for (int i = 1; i < 5; i++)
        {
-       tc += SceneTexture.Sample(PointSample, input.sceneUV + float2(rt_h * offset[i], rt_w * offset[i])) * weight[i] +
-        SceneTexture.Sample(PointSample, input.sceneUV - float2(rt_h * offset[i], rt_w * offset[i])) * weight[i];
-   }
+        tc += SceneTexture.Sample(PointSample, input.sceneUV + float2(rt_w * offset[i], rt_w * offset[i])) * weight[i] +
+        SceneTexture.Sample(PointSample, input.sceneUV - float2(rt_w * offset[i], rt_w * offset[i])) * weight[i];
+    }
    
    float alpha = 1.0f - saturate((centreLengthSq - 0.25f + softEdge) / softEdge); // Soft circle calculation based on fact that this circle has a radius of 0.5 (as area UVs go from 0->1)
    ppColour += tc;
