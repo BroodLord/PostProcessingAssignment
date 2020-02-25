@@ -69,8 +69,8 @@ float4 main(PostProcessingInput input) : SV_Target
     float3 NewTop = RGBtoHSL(gTintColour1);
     float3 NewBot = RGBtoHSL(gTintColour2);
     
-    float SinY = sin(input.areaUV.y + gHueLevel);
-    NewTop.x += SinY;
+    float SinY = sin(gHueLevel * 0.3);
+    NewTop.x += (0.314f * SinY);
 
     if (NewTop.x >= 1)
     {
@@ -78,7 +78,7 @@ float4 main(PostProcessingInput input) : SV_Target
     }
     float3 FinalresultTop;
     FinalresultTop = HSLtoRGB(NewTop);
-    NewBot.x += SinY;
+    NewBot.x += (0.314f * SinY);
 
     if (NewBot.x >= 1)
     {

@@ -37,6 +37,7 @@ ID3D11PixelShader*  gSpiralPostProcess     = nullptr;
 ID3D11PixelShader*  gHeatHazePostProcess   = nullptr;
 ID3D11PixelShader* gUnderwaterPostProcess = nullptr;
 ID3D11PixelShader* gBlurPostProcess = nullptr;
+ID3D11PixelShader* gSecondBlurPostProcess = nullptr;
 
 
 
@@ -68,6 +69,7 @@ bool LoadShaders()
 	gDistortPostProcess    = LoadPixelShader ("Distort_pp");
 	gSpiralPostProcess     = LoadPixelShader ("Spiral_pp");
 	gHeatHazePostProcess   = LoadPixelShader ("HeatHaze_pp");
+	gSecondBlurPostProcess = LoadPixelShader ("SecondBlur");
 	gBlurPostProcess = LoadPixelShader("Blur_pp");
 	gUnderwaterPostProcess = LoadPixelShader("Underwater_pp");
 
@@ -78,7 +80,8 @@ bool LoadShaders()
 		gGreyNoisePostProcess       == nullptr || gBurnPostProcess           == nullptr ||
 		gDistortPostProcess         == nullptr || gSpiralPostProcess         == nullptr ||
 		g2DPolygonVertexShader      == nullptr || gBlurPostProcess			 == nullptr || 
-		gUnderwaterPostProcess		== nullptr || gTintHuePostProcess        == nullptr)
+		gUnderwaterPostProcess		== nullptr || gTintHuePostProcess        == nullptr ||
+		gSecondBlurPostProcess      == nullptr)
 	{
 		gLastError = "Error loading shaders";
 		return false;
@@ -91,6 +94,7 @@ bool LoadShaders()
 void ReleaseShaders()
 {
 	if (gHeatHazePostProcess)         gHeatHazePostProcess       ->Release();
+	if (gSecondBlurPostProcess)       gSecondBlurPostProcess     ->Release();
 	if (gSpiralPostProcess)           gSpiralPostProcess         ->Release();
 	if (gDistortPostProcess)          gDistortPostProcess        ->Release();
 	if (gBlurPostProcess)             gBlurPostProcess			 ->Release();
