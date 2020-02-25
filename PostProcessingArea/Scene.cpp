@@ -636,8 +636,8 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	else if (postProcess == PostProcess::TintHue)
 	{
 		
-		gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2] };
-		gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2] };
+		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2] };
+		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2] };
 		gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
 	}
 
@@ -825,8 +825,8 @@ void FullScreenPostProcess(PostProcess postProcess)
 		else if (PostProcessingVector[i] == PostProcess::TintHue)
 		{
 			
-			gPostProcessingConstants.tintHueColour1 = { PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2] };
-			gPostProcessingConstants.tintHueColour2 = { PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2] };
+			gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2] };
+			gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2] };
 			gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
 		}
 
@@ -1135,7 +1135,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Tint;
 			PostProcessData PPD;
 			float tempTop[3] = { 0.3f,0.8f,0.0f };
-			float tempMid[3] = { 0.1f,0.5f,1.0f };;
+			float tempMid[3] = { 0.1f,0.5f,1.0f };
 			PPD.tint.tint(tempTop, tempMid);
 			PostProcessingDataVector.push_back(PPD);
 			PostProcessingVector.push_back(gCurrentPostProcess);
@@ -1144,8 +1144,8 @@ void RenderScene()
 		{
 			gCurrentPostProcess = PostProcess::TintHue;
 			PostProcessData PPD;
-			float tempHue1[3] = { 77.0f,204.0f,0.0f };
-			float tempHue2[3] = { 26.0f,128.0f,255.0f };;
+			float tempHue1[3] = { 0.3f,0.8f,0.0f };
+			float tempHue2[3] = { 0.1f,0.5f,1.0f };
 			PPD.Hue.Hue(tempHue1, tempHue2);
 			PostProcessingDataVector.push_back({ PPD });
 			PostProcessingVector.push_back(gCurrentPostProcess);
@@ -1323,6 +1323,9 @@ void UpdateScene(float frameTime)
 
 	// Set and increase the burn level (cycling back to 0 when it reaches 1.0f)
 	gPostProcessingConstants.burnHeight = fmod(gPostProcessingConstants.burnHeight + (burnSpeed * FrameTime), 1.0f);
+	static float HueSpeed = 0.5f;
+
+	gPostProcessingConstants.HueLevel += HueSpeed * frameTime;
 
 	gPostProcessingConstants.WaterLevel += WaterSpeed * frameTime;
 

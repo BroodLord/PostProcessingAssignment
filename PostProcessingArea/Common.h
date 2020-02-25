@@ -125,10 +125,9 @@ struct PostProcessingConstants
 	float    paddingB1;
 	CVector3 tintColour2;
 	float    paddingB2;
-	CVector3 tintHueColour1;
-	float    paddingB3;
-	CVector3 tintHueColour2;
-	float    paddingB4;
+
+	float HueLevel;
+	float paddingHL;
 
 	int blurStrength;
 	float paddingBS;

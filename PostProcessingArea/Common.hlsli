@@ -137,11 +137,9 @@ cbuffer PostProcessingConstants : register(b1)
     float3 gTintColour2;
     float paddingB2;
     // Tint post-process settings
-    float3 gTintHueColour1;
-    float paddingB3;
-    
-    float3 gTintHueColour2;
-    float paddingB4;
+
+    float gHueLevel;
+    float paddingHL;
 
     int gblurStrength;
     float paddingBS;

@@ -66,10 +66,10 @@ float4 main(PostProcessingInput input) : SV_Target
     float2 centreVector = input.areaUV - float2(0.5, 0.5f);
     float centreLengthSq = dot(centreVector, centreVector);
 
-    float3 NewTop = RGBtoHSL(gTintHueColour1);
-    float3 NewBot = RGBtoHSL(gTintHueColour2);
+    float3 NewTop = RGBtoHSL(gTintColour1);
+    float3 NewBot = RGBtoHSL(gTintColour2);
     
-    float SinY = sin(input.areaUV.y);
+    float SinY = sin(input.areaUV.y + gHueLevel);
     NewTop.x += SinY;
 
     if (NewTop.x >= 1)
