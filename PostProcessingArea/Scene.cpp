@@ -133,6 +133,13 @@ const char* PPNames[] = {
 
 };
 
+const char* ModeNames[] = {
+	"FullScreen",
+	"Area",
+	"Polygon"
+};
+
+
 enum class PostProcessMode
 {
 	Fullscreen,
@@ -140,10 +147,39 @@ enum class PostProcessMode
 	Polygon,
 };
 
+struct ModelStruct
+{
+	Model* Mod;
+	std::string Name;
+	void Set(Model* M, std::string N)
+	{
+		Mod = M;
+		Name = N;
+	}
+};
+
+struct PostProcessingData2
+{
+	Model* Mod;
+	std::string Name;
+	PostProcess PP;
+	PostProcessMode PostProcessingMode;
+	void Set(PostProcess P, PostProcessMode PM, Model* M, std::string N)
+	{
+		Name = N;
+		Mod = M;
+		PP = P;
+		PostProcessingMode = PM;
+
+	}
+};
+
+
 
 auto gCurrentPostProcess = PostProcess::None;
 auto gCurrentPostProcessMode = PostProcessMode::Fullscreen;
-std::vector<PostProcess> PostProcessingVector;
+std::vector<PostProcessingData2> PostProcessingVector;
+std::vector<ModelStruct> ModelVector;
 std::vector<PostProcessData> PostProcessingDataVector;
 //********************
 
@@ -186,6 +222,8 @@ Light gLights[NUM_LIGHTS];
 static int Counter = 0;
 static float burnSpeed = 2.0f;
 static float WaterSpeed = 1.0f;
+static int Selected_Item = 0;
+static int Selected_Screen = 0;
 
 // Additional light information
 CVector3 gAmbientColour = { 0.3f, 0.3f, 0.4f }; // Background level of light (slightly bluish to match the far background, which is dark blue)
@@ -452,6 +490,16 @@ bool InitScene()
 	gCamera->SetPosition({ 25, 18, -45 });
 	gCamera->SetRotation({ ToRadians(10.0f), ToRadians(7.0f), 0.0f });
 
+	ModelStruct MS;
+	MS.Set(gCube, "Cube");
+	ModelVector.push_back(MS);
+	MS.Set(gCrate, "Create");
+	ModelVector.push_back(MS);
+	MS.Set(gLights[0].model, "Light_1");
+	ModelVector.push_back(MS);
+	MS.Set(gLights[1].model, "Light_2");
+	ModelVector.push_back(MS);
+
 	return true;
 }
 
@@ -608,154 +656,7 @@ void RenderSceneFromCamera(Camera* camera)
 // Helper function shared by full-screen, area and polygon post-processing functions below
 void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 {
-	//for (int i = 0; i < PostProcessingVector.size(); i++)
-	//{
-	//
-	//	// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
-	//	ID3D11ShaderResourceView* nullSRV = nullptr;
-	//	gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
-	//	if (i % 2 == 0)
-	//	{
-	//		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
-	//		gD3DContext->OMSetRenderTargets(1, &gBackRenderTarget, gDepthStencil);
-	//
-	//
-	//		// Give the pixel shader (post-processing shader) access to the scene texture 
-	//		gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-	//		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	//
-	//	}
-	//	else
-	//	{
-	//		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
-	//		gD3DContext->OMSetRenderTargets(1, &gSceneRenderTarget, gDepthStencil);
-	//
-	//		// Give the pixel shader (post-processing shader) access to the scene texture 
-	//		gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-	//		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	//	}
-	//
-	//
-	//	// Prepare custom settings for current post-process
-	//	if (PostProcessingVector[i] == PostProcess::Copy)
-	//	{
-	//		gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
-	//	}
-	//
-	//	if (PostProcessingVector[i] == PostProcess::Blur)
-	//	{
-	//		gPostProcessingConstants.blurStrength = PostProcessingDataVector[i].Blur.blur;
-	//		gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
-	//	}
-	//	if (PostProcessingVector[i] == PostProcess::Blur)
-	//	{
-	//		gPostProcessingConstants.blurStrength = PostProcessingDataVector[i].Blur.blur;
-	//		gD3DContext->PSSetShader(gSecondBlurPostProcess, nullptr, 0);
-	//	}
-	//	else if (PostProcessingVector[i] == PostProcess::Underwater)
-	//	{
-	//		WaterSpeed = PostProcessingDataVector[i].Water.waterSpeed;
-	//		gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
-	//
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::Tint)
-	//	{
-	//
-	//		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[i].tint.rgbTop[0] ,PostProcessingDataVector[i].tint.rgbTop[1] ,PostProcessingDataVector[i].tint.rgbTop[2] };
-	//		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[i].tint.rgbMid[0] ,PostProcessingDataVector[i].tint.rgbMid[1] ,PostProcessingDataVector[i].tint.rgbMid[2] };
-	//		gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::TintHue)
-	//	{
-	//
-	//		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[i].Hue.Hue1[0], PostProcessingDataVector[i].Hue.Hue1[1], PostProcessingDataVector[i].Hue.Hue1[2] };
-	//		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[i].Hue.Hue2[0], PostProcessingDataVector[i].Hue.Hue2[1], PostProcessingDataVector[i].Hue.Hue2[2] };
-	//		gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::GreyNoise)
-	//	{
-	//		gD3DContext->PSSetShader(gGreyNoisePostProcess, nullptr, 0);
-	//		float grainSize; // Fineness of the noise grain
-	//		grainSize = PostProcessingDataVector[i].Noise.grainSize;
-	//		gPostProcessingConstants.noiseScale = { gViewportWidth / grainSize, gViewportHeight / grainSize };
-	//		// Give pixel shader access to the noise texture
-	//		gD3DContext->PSSetShaderResources(1, 1, &gNoiseMapSRV);
-	//		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::Burn)
-	//	{
-	//
-	//		gD3DContext->PSSetShader(gBurnPostProcess, nullptr, 0);
-	//
-	//		burnSpeed = PostProcessingDataVector[i].Burn.burnSpeed;
-	//		// Give pixel shader access to the burn texture (basically a height map that the burn level ascends)
-	//		gD3DContext->PSSetShaderResources(1, 1, &gBurnMapSRV);
-	//		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::Distort)
-	//	{
-	//		gD3DContext->PSSetShader(gDistortPostProcess, nullptr, 0);
-	//
-	//		// Give pixel shader access to the distortion texture (containts 2D vectors (in R & G) to shift the texture UVs to give a cut-glass impression)
-	//		gD3DContext->PSSetShaderResources(1, 1, &gDistortMapSRV);
-	//		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::Spiral)
-	//	{
-	//		gD3DContext->PSSetShader(gSpiralPostProcess, nullptr, 0);
-	//	}
-	//
-	//	else if (PostProcessingVector[i] == PostProcess::HeatHaze)
-	//	{
-	//		gD3DContext->PSSetShader(gHeatHazePostProcess, nullptr, 0);
-	//	}
-	//	////Set 2D area for full-screen post-processing (coordinates in 0->1 range)
-	//	//gPostProcessingConstants.area2DTopLeft = { 0, 0 }; // Top-left of entire screen
-	//	//gPostProcessingConstants.area2DSize = { 1, 1 }; // Full size of screen
-	//	//gPostProcessingConstants.area2DDepth = 0;        // Depth buffer value for full screen is as close as possible
-	//
-	//	UpdateConstantBuffer(gPostProcessingConstantBuffer, gPostProcessingConstants);
-	//	gD3DContext->VSSetConstantBuffers(1, 1, &gPostProcessingConstantBuffer);
-	//	gD3DContext->PSSetConstantBuffers(1, 1, &gPostProcessingConstantBuffer);
-	//
-	//
-	//	//// Draw a quad
-	//	gD3DContext->Draw(4, 0);
-	//}
-	//
-	//// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
-	//ID3D11ShaderResourceView* nullSRV = nullptr;
-	//gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
-	//gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
-	//gD3DContext->ClearRenderTargetView(gBackBufferRenderTarget, &gBackgroundColor.r);
-	//
-	//
-	//if (PostProcessingVector.size() % 2 == 0)
-	//{
-	//
-	//	// Give the pixel shader (post-processing shader) access to the scene texture 
-	//	gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-	//	gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	//
-	//}
-	//else
-	//{
-	//	// Give the pixel shader (post-processing shader) access to the scene texture 
-	//	gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
-	//	gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	//}
-	//UpdateConstantBuffer(gPostProcessingConstantBuffer, gPostProcessingConstants);
-	//gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
 
-
-	// Draw a quad
-	//gD3DContext->Draw(4, 0);
 
 	// Prepare custom settings for current post-process
 	if (postProcess == PostProcess::Copy)
@@ -766,31 +667,35 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	{
 		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
 		gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
+	}
+	else if (postProcess == PostProcess::SecondBlur)
+	{
+		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
 		gD3DContext->PSSetShader(gSecondBlurPostProcess, nullptr, 0);
 	}
 	else if (postProcess == PostProcess::Underwater)
 	{
 		WaterSpeed = PostProcessingDataVector[Counter].Water.waterSpeed;
 		gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
-	
+
 	}
-	
+
 	else if (postProcess == PostProcess::Tint)
 	{
-	
+
 		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[Counter].tint.rgbTop[0] ,PostProcessingDataVector[Counter].tint.rgbTop[1] ,PostProcessingDataVector[Counter].tint.rgbTop[2] };
 		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[Counter].tint.rgbMid[0] ,PostProcessingDataVector[Counter].tint.rgbMid[1] ,PostProcessingDataVector[Counter].tint.rgbMid[2] };
 		gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
 	}
-	
+
 	else if (postProcess == PostProcess::TintHue)
 	{
-		
+
 		gPostProcessingConstants.tintColour1 = { PostProcessingDataVector[Counter].Hue.Hue1[0], PostProcessingDataVector[Counter].Hue.Hue1[1], PostProcessingDataVector[Counter].Hue.Hue1[2] };
 		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[Counter].Hue.Hue2[0], PostProcessingDataVector[Counter].Hue.Hue2[1], PostProcessingDataVector[Counter].Hue.Hue2[2] };
 		gD3DContext->PSSetShader(gTintHuePostProcess, nullptr, 0);
 	}
-	
+
 	else if (postProcess == PostProcess::GreyNoise)
 	{
 		gD3DContext->PSSetShader(gGreyNoisePostProcess, nullptr, 0);
@@ -801,32 +706,32 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 		gD3DContext->PSSetShaderResources(1, 1, &gNoiseMapSRV);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
 	}
-	
+
 	else if (postProcess == PostProcess::Burn)
 	{
-	
+
 		gD3DContext->PSSetShader(gBurnPostProcess, nullptr, 0);
-	
+
 		burnSpeed = PostProcessingDataVector[Counter].Burn.burnSpeed;
 		// Give pixel shader access to the burn texture (basically a height map that the burn level ascends)
 		gD3DContext->PSSetShaderResources(1, 1, &gBurnMapSRV);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
 	}
-	
+
 	else if (postProcess == PostProcess::Distort)
 	{
 		gD3DContext->PSSetShader(gDistortPostProcess, nullptr, 0);
-	
+
 		// Give pixel shader access to the distortion texture (containts 2D vectors (in R & G) to shift the texture UVs to give a cut-glass impression)
 		gD3DContext->PSSetShaderResources(1, 1, &gDistortMapSRV);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
 	}
-	
+
 	else if (postProcess == PostProcess::Spiral)
 	{
 		gD3DContext->PSSetShader(gSpiralPostProcess, nullptr, 0);
 	}
-	
+
 	else if (postProcess == PostProcess::HeatHaze)
 	{
 		gD3DContext->PSSetShader(gHeatHazePostProcess, nullptr, 0);
@@ -840,30 +745,23 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 void FullScreenPostProcess(PostProcess postProcess)
 {
 
-	//// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
-	//gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
-	//
-	//
-	//// Give the pixel shader (post-processing shader) access to the scene texture 
-	//gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV);
-	//gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	
-	
+
+
 	// Using special vertex shader that creates its own data for a 2D screen quad
 	gD3DContext->VSSetShader(g2DQuadVertexShader, nullptr, 0);
 	gD3DContext->GSSetShader(nullptr, nullptr, 0);  // Switch off geometry shader when not using it (pass nullptr for first parameter)
-	
-	
+
+
 	// States - no blending, don't write to depth buffer and ignore back-face culling
 	gD3DContext->OMSetBlendState(gNoBlendingState, nullptr, 0xffffff);
 	gD3DContext->OMSetDepthStencilState(gDepthReadOnlyState, 0);
 	gD3DContext->RSSetState(gCullNoneState);
-	
-	
+
+
 	// No need to set vertex/index buffer (see 2D quad vertex shader), just indicate that the quad will be created as a triangle strip
 	gD3DContext->IASetInputLayout(NULL); // No vertex data
 	gD3DContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	
+
 	ID3D11ShaderResourceView* nullSRV = nullptr;
 	gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
 	if (Counter % 2 == 0)
@@ -886,23 +784,23 @@ void FullScreenPostProcess(PostProcess postProcess)
 		gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
 		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
 	}
-	
+
 	// Select shader and textures needed for the required post-processes (helper function above)
 	SelectPostProcessShaderAndTextures(postProcess);
-	
-	
+
+
 	// Set 2D area for full-screen post-processing (coordinates in 0->1 range)
 	gPostProcessingConstants.area2DTopLeft = { 0, 0 }; // Top-left of entire screen
-	gPostProcessingConstants.area2DSize    = { 1, 1 }; // Full size of screen
-	gPostProcessingConstants.area2DDepth   = 0;        // Depth buffer value for full screen is as close as possible
-	
-	
+	gPostProcessingConstants.area2DSize = { 1, 1 }; // Full size of screen
+	gPostProcessingConstants.area2DDepth = 0;        // Depth buffer value for full screen is as close as possible
+
+
 	// Pass over the above post-processing settings (also the per-process settings prepared in UpdateScene function below)
 	UpdateConstantBuffer(gPostProcessingConstantBuffer, gPostProcessingConstants);
 	gD3DContext->VSSetConstantBuffers(1, 1, &gPostProcessingConstantBuffer);
 	gD3DContext->PSSetConstantBuffers(1, 1, &gPostProcessingConstantBuffer);
-	
-	
+
+
 	// Draw a quad
 	gD3DContext->Draw(4, 0);
 
@@ -910,30 +808,9 @@ void FullScreenPostProcess(PostProcess postProcess)
 
 	gD3DContext->Draw(4, 0);
 
-	//gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
-	//
-	//
-	//// Give the pixel shader (post-processing shader) access to the scene texture 
-	//gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV);
-	//gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
-	//
-	//// Using special vertex shader than creates its own data for a full screen quad
-	//gD3DContext->VSSetShader(g2DQuadVertexShader, nullptr, 0);
-	//gD3DContext->GSSetShader(nullptr, nullptr, 0);  // Switch off geometry shader when not using it (pass nullptr for first parameter)
-	//
-	//
-	//// States - no blending, ignore depth buffer and culling
-	//gD3DContext->OMSetBlendState(gNoBlendingState, nullptr, 0xffffff);
-	//gD3DContext->OMSetDepthStencilState(gNoDepthBufferState, 0);
-	//gD3DContext->RSSetState(gCullNoneState);
-	//
-	//
-	//// No need to set vertex/index buffer (see fullscreen quad vertex shader), just indicate that the quad will be created as a triangle strip
-	//gD3DContext->IASetInputLayout(NULL); // No vertex data
-	//gD3DContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-	
-	
-	
+
+
+
 
 }
 
@@ -950,6 +827,30 @@ void AreaPostProcess(PostProcess postProcess, CVector3 worldPoint, CVector2 area
 	////       aware of all the work that the above function did that was also preparation for this post-process area step
 	//
 	//// Select shader/textures needed for required post-process
+
+	ID3D11ShaderResourceView* nullSRV = nullptr;
+	gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
+	if (Counter % 2 == 0)
+	{
+		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
+		gD3DContext->OMSetRenderTargets(1, &gBackRenderTarget, gDepthStencil);
+
+
+		// Give the pixel shader (post-processing shader) access to the scene texture 
+		gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
+		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
+
+	}
+	else
+	{
+		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
+		gD3DContext->OMSetRenderTargets(1, &gSceneRenderTarget, gDepthStencil);
+
+		// Give the pixel shader (post-processing shader) access to the scene texture 
+		gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
+		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
+	}
+
 	SelectPostProcessShaderAndTextures(postProcess);
 
 	// Enable alpha blending - area effects need to fade out at the edges or the hard edge of the area is visible
@@ -1003,11 +904,16 @@ void AreaPostProcess(PostProcess postProcess, CVector3 worldPoint, CVector2 area
 
 	// Draw a quad
 	gD3DContext->Draw(4, 0);
+
+	gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
+
+	gD3DContext->Draw(4, 0);
+
 }
 
 
 // Perform an post process from "scene texture" to back buffer within the given four-point polygon and a world matrix to position/rotate/scale the polygon
-void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4>& points, const CMatrix4x4& worldMatrix)
+void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4> & points, const CMatrix4x4& worldMatrix)
 {
 	// First perform a full-screen copy of the scene to back-buffer
 	FullScreenPostProcess(PostProcess::Copy);
@@ -1019,6 +925,30 @@ void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4>& 
 	//       aware of all the work that the above function did that was also preparation for this post-process area step
 
 	// Select shader/textures needed for required post-process
+
+	ID3D11ShaderResourceView* nullSRV = nullptr;
+	gD3DContext->PSSetShaderResources(0, 1, &nullSRV);
+	if (Counter % 2 == 0)
+	{
+		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
+		gD3DContext->OMSetRenderTargets(1, &gBackRenderTarget, gDepthStencil);
+
+
+		// Give the pixel shader (post-processing shader) access to the scene texture 
+		gD3DContext->PSSetShaderResources(0, 1, &gSceneTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
+		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
+
+	}
+	else
+	{
+		// Select the back buffer to use for rendering. Not going to clear the back-buffer because we're going to overwrite it all
+		gD3DContext->OMSetRenderTargets(1, &gSceneRenderTarget, gDepthStencil);
+
+		// Give the pixel shader (post-processing shader) access to the scene texture 
+		gD3DContext->PSSetShaderResources(0, 1, &gBackTextureSRV/* MISSING select the scene texture shader resource view (note: needs an &)*/);
+		gD3DContext->PSSetSamplers(0, 1, &gPointSampler); // Use point sampling (no bilinear, trilinear, mip-mapping etc. for most post-processes)
+	}
+
 	SelectPostProcessShaderAndTextures(postProcess);
 
 	// Loop through the given points, transform each to 2D (this is what the vertex shader normally does in most labs)
@@ -1038,6 +968,9 @@ void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4>& 
 
 	// Select the special 2D polygon post-processing vertex shader and draw the polygon
 	gD3DContext->VSSetShader(g2DPolygonVertexShader, nullptr, 0);
+	gD3DContext->Draw(4, 0);
+	gD3DContext->OMSetRenderTargets(1, &gBackBufferRenderTarget, gDepthStencil);
+
 	gD3DContext->Draw(4, 0);
 
 }
@@ -1115,33 +1048,39 @@ void RenderScene()
 	{
 		for (int i = 0; i < PostProcessingVector.size(); i++)
 		{
-			if (gCurrentPostProcessMode == PostProcessMode::Fullscreen)
+			if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Fullscreen)
 			{
-				FullScreenPostProcess(PostProcessingVector[i]);
+				FullScreenPostProcess(PostProcessingVector[i].PP);
 				Counter++;
 			}
+			
+		
+			if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Area)
+			{
+				// Pass a 3D point for the centre of the affected area and the size of the (rectangular) area in world units
+				AreaPostProcess(PostProcessingVector[i].PP, PostProcessingVector[i].Mod->Position(), { 10, 10 }, 3.2f);
+				Counter++;
+			}
+
+			else if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Polygon)
+			{
+				// An array of four points in world space - a tapered square centred at the origin
+				const std::array<CVector3, 4> points = { { {-3,5,0}, {-5,-5,0}, {3,5,0}, {5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
+
+				// A rotating matrix placing the model above in the scene
+				static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
+				polyMatrix = MatrixRotationY(ToRadians(1)) * polyMatrix;
+
+				// Pass an array of 4 points and a matrix. Only supports 4 points.
+				PolygonPostProcess(PostProcessingVector[i].PP, points, polyMatrix);
+				Counter++;
+
+
+			}
 		}
-		Counter = 0;
-		if (gCurrentPostProcessMode == PostProcessMode::Area)
-		{
-			// Pass a 3D point for the centre of the affected area and the size of the (rectangular) area in world units
-			AreaPostProcess(gCurrentPostProcess, gCube->Position(), { 10, 10 }, 3.2f);
-		}
-
-		else if (gCurrentPostProcessMode == PostProcessMode::Polygon)
-		{
-			// An array of four points in world space - a tapered square centred at the origin
-			const std::array<CVector3, 4> points = { { {-3,5,0}, {-5,-5,0}, {3,5,0}, {5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
-
-			// A rotating matrix placing the model above in the scene
-			static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
-			polyMatrix = MatrixRotationY(ToRadians(1)) * polyMatrix;
-
-			// Pass an array of 4 points and a matrix. Only supports 4 points.
-			PolygonPostProcess(gCurrentPostProcess, points, polyMatrix);
-
-		}
-
+			Counter = 0;
+		
+		
 
 		// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
 		ID3D11ShaderResourceView* nullSRV = nullptr;
@@ -1155,7 +1094,41 @@ void RenderScene()
 	// You can draw ImGUI elements at any time between the frame preparation code at the top
 	// of this function, and the finalisation code below
 
-	//ImGui::ShowDemoWindow();
+	ImGui::Begin("Model & Screen_Mode Selection", 0, ImGuiWindowFlags_AlwaysAutoResize);
+	int i = 0;
+	for (std::vector<ModelStruct>::iterator it = ModelVector.begin(); it != ModelVector.end(); ++it) {
+		std::string HashTag = "##" + std::to_string(i);
+		if (ImGui::Selectable(HashTag.c_str(), i == Selected_Item))
+		{
+			Selected_Item = i;
+		}
+
+		ImGui::SameLine();
+		ImGui::Text("Model: ");
+		ImGui::SameLine();
+		ImGui::Text((*it).Name.c_str());
+		i++;
+	}
+	if (ImGui::Button("FullScreen", ImVec2(130, 20)))
+	{
+		Selected_Screen = 0;
+		gCurrentPostProcessMode = PostProcessMode::Fullscreen;
+	}
+	if (ImGui::Button("Area", ImVec2(130, 20)))
+	{
+		Selected_Screen = 1;
+		gCurrentPostProcessMode = PostProcessMode::Area;
+	}
+	if (ImGui::Button("Polygon", ImVec2(130, 20)))
+	{
+		Selected_Screen = 2;
+		gCurrentPostProcessMode = PostProcessMode::Polygon;
+	}
+	ImGui::Text("Current Screen Mode: ");
+	ImGui::SameLine();
+	ImGui::Text(ModeNames[Selected_Screen]);
+	ImGui::End();
+
 	ImGui::Begin("PostProcessingWindow", 0, ImGuiWindowFlags_AlwaysAutoResize);
 	//ImGui::Button("Tint");
 	if (ImGui::BeginMenu("PostProcessers"))
@@ -1167,7 +1140,9 @@ void RenderScene()
 			float tempMid[3] = { 0.1f,0.5f,1.0f };
 			PPD.tint.tint(tempTop, tempMid);
 			PostProcessingDataVector.push_back(PPD);
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("TintHue", ImVec2(100, 20)))
 		{
@@ -1177,56 +1152,74 @@ void RenderScene()
 			float tempHue2[3] = { 0.1f,0.5f,1.0f };
 			PPD.Hue.Hue(tempHue1, tempHue2);
 			PostProcessingDataVector.push_back({ PPD });
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Blur", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Blur;
 			PostProcessData Blur;
+			PostProcessingData2 PPNM;
 			Blur.Blur.Blur(5);
 			PostProcessingDataVector.push_back(Blur);
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::SecondBlur;
-			PostProcessingDataVector.push_back({});
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingDataVector.push_back({ Blur });
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Burn", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Burn;
 			PostProcessingDataVector.push_back({ 1.0f });
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Distort", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Distort;
 			PostProcessingDataVector.push_back({});
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Spiral", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Spiral;
 			PostProcessingDataVector.push_back({});
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("HeatHaze", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::HeatHaze;
 			PostProcessingDataVector.push_back({});
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("GreyNoise", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::GreyNoise;
 			PostProcessingDataVector.push_back({ 140.0f });
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+
 		}
 		if (ImGui::Button("Underwater", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Underwater;
 			PostProcessingDataVector.push_back({ 1.0f });
-			PostProcessingVector.push_back(gCurrentPostProcess);
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
 		}
-		//ImGui::SameLine();
+		ImGui::SameLine();
 		ImGui::EndMenu();
 	}
 	if (ImGui::Button("Clear Screen", ImVec2(100, 20)))
@@ -1239,12 +1232,14 @@ void RenderScene()
 	ImGui::Text("Active Postprocessers");
 	for (int i = 0; i < PostProcessingVector.size(); i++)
 	{
-		if (PPNames[(int)PostProcessingVector[i]] != "SecondBlur")
+
+		ImGui::PushID(i);
+		if (PPNames[(int)PostProcessingVector[i].PP] != "SecondBlur")
 		{
-			ImGui::PushID(i);
 			if (ImGui::Button("x", ImVec2(15, 20)))
 			{
-				if (PPNames[(int)PostProcessingVector[i]] == "Blur")
+
+				if (PPNames[(int)PostProcessingVector[i].PP] == "Blur")
 				{
 					PostProcessingVector.erase(PostProcessingVector.begin() + i);
 					PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
@@ -1261,65 +1256,91 @@ void RenderScene()
 				}
 				break;
 			}
+
 			ImGui::SameLine();
-			ImGui::Text(PPNames[(int)PostProcessingVector[i]]);
-			if (PPNames[(int)PostProcessingVector[i]] == "Tint")
-			{
-				ImGui::SameLine();
-				if (ImGui::BeginMenu("ColourPicker"))
-				{
-					float tintG0[3] = { 0.0f, 0.0f, 0.0f };
-					ImGui::ColorEdit3("Tint Editor - Gradiant 1", PostProcessingDataVector[i].tint.rgbTop, ImGuiColorEditFlags_PickerHueWheel);
-					float tintG1[3] = { 0.0f, 0.0f, 0.0f };
-					ImGui::ColorEdit3("Tint Editor - Gradiant 2", PostProcessingDataVector[i].tint.rgbMid, ImGuiColorEditFlags_PickerHueWheel);
-					ImGui::EndMenu();
-				}
-			}
-			if (PPNames[(int)PostProcessingVector[i]] == "Underwater")
-			{
-				ImGui::SameLine();
-				if (ImGui::BeginMenu("Water Properties"))
-				{
-					ImGui::SliderFloat("WaterSpeed", &PostProcessingDataVector[i].Noise.grainSize, 0.0f, 2.0f);
-					ImGui::EndMenu();
-				}
-			}
-			if (PPNames[(int)PostProcessingVector[i]] == "Blur")
-			{
-				ImGui::SameLine();
-				if (ImGui::BeginMenu("Blur Properties"))
-				{
-					ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
-					ImGui::EndMenu();
-				}
-			}
-			if (PPNames[(int)PostProcessingVector[i]] == "GreyNoise")
-			{
-				ImGui::SameLine();
-				if (ImGui::BeginMenu("Noise Properties"))
-				{
-					ImGui::SliderFloat("GrainSize", &PostProcessingDataVector[i].Noise.grainSize, 0.0f, 380.0f);
-					ImGui::EndMenu();
-				}
-			}
-			if (PPNames[(int)PostProcessingVector[i]] == "Burn")
-			{
-				ImGui::SameLine();
-				if (ImGui::BeginMenu("Burn Properties"))
-				{
-					ImGui::SliderFloat("BurnSpeed", &PostProcessingDataVector[i].Burn.burnSpeed, 0.0f, 2.0f);
-					ImGui::EndMenu();
-				}
-			}
-			ImGui::PopID();
 		}
+		ImGui::Text(PPNames[(int)PostProcessingVector[i].PP]);
+		ImGui::SameLine();
+		ImGui::Text("(");
+		ImGui::SameLine();
+		ImGui::Text(ModeNames[(int)PostProcessingVector[i].PostProcessingMode]);
+		ImGui::SameLine();
+		if (ModeNames[(int)PostProcessingVector[i].PostProcessingMode] == "FullScreen")
+		{
+			ImGui::Text("");
+			
+		}
+		else
+		{
+			ImGui::Text(PostProcessingVector[i].Name.c_str());
+		}
+		ImGui::SameLine();
+		ImGui::Text(")");
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Tint")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("ColourPicker"))
+			{
+				float tintG0[3] = { 0.0f, 0.0f, 0.0f };
+				ImGui::ColorEdit3("Tint Editor - Gradiant 1", PostProcessingDataVector[i].tint.rgbTop, ImGuiColorEditFlags_PickerHueWheel);
+				float tintG1[3] = { 0.0f, 0.0f, 0.0f };
+				ImGui::ColorEdit3("Tint Editor - Gradiant 2", PostProcessingDataVector[i].tint.rgbMid, ImGuiColorEditFlags_PickerHueWheel);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Underwater")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Water Properties"))
+			{
+				ImGui::SliderFloat("WaterSpeed", &PostProcessingDataVector[i].Noise.grainSize, 0.0f, 2.0f);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Blur")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Blur Properties"))
+			{
+				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "SecondBlur")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("SecondBlur Properties"))
+			{
+				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "GreyNoise")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Noise Properties"))
+			{
+				ImGui::SliderFloat("GrainSize", &PostProcessingDataVector[i].Noise.grainSize, 0.0f, 380.0f);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Burn")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Burn Properties"))
+			{
+				ImGui::SliderFloat("BurnSpeed", &PostProcessingDataVector[i].Burn.burnSpeed, 0.0f, 2.0f);
+				ImGui::EndMenu();
+			}
+		}
+		ImGui::PopID();
+
 	}
 
 
 	//ImGui::EndMenu();
 	ImGui::End();
-
-
+	
 
 	//*******************************
 
@@ -1350,12 +1371,13 @@ void RenderScene()
 void UpdateScene(float frameTime)
 {
 	FrameTime = frameTime;
+
 	//***********
 
-	// Select post process on keys
-	if (KeyHit(Key_F1))  gCurrentPostProcessMode = PostProcessMode::Fullscreen;
-	if (KeyHit(Key_F2))  gCurrentPostProcessMode = PostProcessMode::Area;
-	if (KeyHit(Key_F3))  gCurrentPostProcessMode = PostProcessMode::Polygon;
+	//// Select post process on keys
+	//if (KeyHit(Key_F1))  gCurrentPostProcessMode = PostProcessMode::Fullscreen;
+	//if (KeyHit(Key_F2))  gCurrentPostProcessMode = PostProcessMode::Area;
+	//if (KeyHit(Key_F3))  gCurrentPostProcessMode = PostProcessMode::Polygon;
 
 
 
