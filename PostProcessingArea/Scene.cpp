@@ -174,6 +174,11 @@ struct PostProcessingData2
 	}
 };
 
+void WeightCreation(int SampleAmount)
+{
+	
+}
+
 
 
 auto gCurrentPostProcess = PostProcess::None;
