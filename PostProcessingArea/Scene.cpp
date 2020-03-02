@@ -26,6 +26,9 @@
 #include <List>
 #include <array>
 #include <sstream>
+#include <cmath> 
+#include <iomanip> 
+#include <iostream>
 #include <memory>
 
 
@@ -49,9 +52,36 @@ enum class PostProcess
 	SecondBlur,
 	Underwater,
 	HeatHaze,
+	NightVision,
 };
 
+float GKernel[5];
 
+// Function to create Gaussian filter 
+void FilterCreation(float GKernel[5])
+{
+	// intialising standard deviation to 1.0 
+	float sigma = 1.0;
+	float r, s = 2.0 * sigma * sigma;
+
+	// sum is for normalization 
+	float sum = 0.0;
+
+	// generating 5x5 kernel 
+	for (int x = -2; x <= 2; x++) {
+
+		r = sqrt(x * x);
+		GKernel[x + 2] = (exp(-(r * r) / s)) / (3.14 * s);
+		sum += GKernel[x + 2];
+
+	}
+
+	// normalising the Kernel 
+	for (int i = 0; i < 5; ++i) {
+
+		GKernel[i] /= sum;
+	}
+}
 
 
 struct PostProcessData
@@ -129,14 +159,16 @@ const char* PPNames[] = {
 	"Blur",
 	"SecondBlur",
 	"Underwater",
-	"HeatHaze"
+	"HeatHaze",
+	"NightVision"
 
 };
 
 const char* ModeNames[] = {
 	"FullScreen",
 	"Area",
-	"Polygon"
+	"Polygon",
+	"ModelPolygon"
 };
 
 
@@ -145,6 +177,7 @@ enum class PostProcessMode
 	Fullscreen,
 	Area,
 	Polygon,
+	ModelPolygon
 };
 
 struct ModelStruct
@@ -174,12 +207,6 @@ struct PostProcessingData2
 	}
 };
 
-void WeightCreation(int SampleAmount)
-{
-	
-}
-
-
 
 auto gCurrentPostProcess = PostProcess::None;
 auto gCurrentPostProcessMode = PostProcessMode::Fullscreen;
@@ -205,11 +232,21 @@ Mesh* gGroundMesh;
 Mesh* gCubeMesh;
 Mesh* gCrateMesh;
 Mesh* gLightMesh;
+Mesh* gWallTwoMesh;
+Mesh* gWallOneMesh;
 
+Model* gWallOne;
+Model* gWallTwo;
+Model* gLargeWindow;
+Model* gSmallWindow1;
+Model* gSmallWindow2;
+Model* gSmallWindow3;
+Model* gSmallWindow4;
 Model* gStars;
 Model* gGround;
 Model* gCube;
 Model* gCrate;
+
 
 Camera* gCamera;
 
@@ -275,6 +312,11 @@ ID3D11ShaderResourceView* gCrateDiffuseSpecularMapSRV = nullptr;
 ID3D11Resource* gCubeDiffuseSpecularMap = nullptr;
 ID3D11ShaderResourceView* gCubeDiffuseSpecularMapSRV = nullptr;
 
+ID3D11ShaderResourceView* gWallOneDiffuseSpecularMapSRV = nullptr;
+ID3D11Resource* gWallOneDiffuseSpecularMap = nullptr;
+ID3D11ShaderResourceView* gWallTwoDiffuseSpecularMapSRV = nullptr;
+ID3D11Resource* gWallTwoDiffuseSpecularMap = nullptr;
+
 ID3D11Resource* gLightDiffuseMap = nullptr;
 ID3D11ShaderResourceView* gLightDiffuseMapSRV = nullptr;
 
@@ -325,6 +367,8 @@ bool InitGeometry()
 		gCubeMesh = new Mesh("Cube.x");
 		gCrateMesh = new Mesh("CargoContainer.x");
 		gLightMesh = new Mesh("Light.x");
+		gWallOneMesh = new Mesh("Wall1.x");
+		gWallTwoMesh = new Mesh("Wall2.x");
 	}
 	catch (std::runtime_error e)  // Constructors cannot return error messages so use exceptions to catch mesh errors (fairly standard approach this)
 	{
@@ -346,7 +390,9 @@ bool InitGeometry()
 		!LoadTexture("Flare.jpg", &gLightDiffuseMap, &gLightDiffuseMapSRV) ||
 		!LoadTexture("Noise.png", &gNoiseMap, &gNoiseMapSRV) ||
 		!LoadTexture("Burn.png", &gBurnMap, &gBurnMapSRV) ||
-		!LoadTexture("Distort.png", &gDistortMap, &gDistortMapSRV))
+		!LoadTexture("Distort.png", &gDistortMap, &gDistortMapSRV) ||
+		!LoadTexture("Brick_35.jpg", &gWallOneDiffuseSpecularMap, &gWallOneDiffuseSpecularMapSRV) ||
+		!LoadTexture("Brick_35.jpg", &gWallTwoDiffuseSpecularMap, &gWallTwoDiffuseSpecularMapSRV))
 	{
 		gLastError = "Error loading textures";
 		return false;
@@ -450,6 +496,48 @@ bool InitGeometry()
 	return true;
 }
 
+void WindowPostProcessSetUp()
+{
+	PostProcessingData2 PPNM;
+	PostProcessData PPD;
+	gCurrentPostProcess = PostProcess::Tint;
+	float tempTop[3] = { 0.3f,0.8f,0.0f };
+	float tempMid[3] = { 0.1f,0.5f,1.0f };
+	PPD.tint.tint(tempTop, tempMid);
+	PostProcessingDataVector.push_back(PPD);
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gLargeWindow, "LargeWindow");
+	PostProcessingVector.push_back(PPNM);
+
+	gCurrentPostProcess = PostProcess::Blur;
+	PostProcessData Blur;
+	Blur.Blur.Blur(5);
+	PostProcessingDataVector.push_back(Blur);
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1");
+	PostProcessingVector.push_back(PPNM);
+	gCurrentPostProcess = PostProcess::SecondBlur;
+	PostProcessingDataVector.push_back({ Blur });
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1");
+	PostProcessingVector.push_back(PPNM);
+
+	gCurrentPostProcess = PostProcess::HeatHaze;
+	PostProcessingDataVector.push_back({});
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow2, "SmallWindow2");
+	PostProcessingVector.push_back(PPNM);
+
+	gCurrentPostProcess = PostProcess::GreyNoise;
+	PostProcessingDataVector.push_back({ 140.0f });
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow3, "SmallWindow3");
+	PostProcessingVector.push_back(PPNM);
+
+	gCurrentPostProcess = PostProcess::TintHue;
+	float tempHue1[3] = { 0.3f,0.8f,0.0f };
+	float tempHue2[3] = { 0.1f,0.5f,1.0f };
+	PPD.Hue.Hue(tempHue1, tempHue2);
+	PostProcessingDataVector.push_back({ PPD });
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4");
+	PostProcessingVector.push_back(PPNM);
+}
+
 
 // Prepare the scene
 // Returns true on success
@@ -461,15 +549,32 @@ bool InitScene()
 	gGround = new Model(gGroundMesh);
 	gCube = new Model(gCubeMesh);
 	gCrate = new Model(gCrateMesh);
+	gWallOne = new Model(gWallOneMesh);
+	gWallTwo = new Model(gWallTwoMesh);
+	gLargeWindow = new Model(gCubeMesh);
+	gSmallWindow1 = new Model(gCubeMesh);
+	gSmallWindow2 = new Model(gCubeMesh);
+	gSmallWindow3 = new Model(gCubeMesh);
+	gSmallWindow4 = new Model(gCubeMesh);
+
 
 	// Initial positions
 	gCube->SetPosition({ 42, 5, -10 });
 	gCube->SetRotation({ 0.0f, ToRadians(-110.0f), 0.0f });
 	gCube->SetScale(1.5f);
+	gWallOne->SetPosition({ 30, 20, -10 });
+	gWallOne->SetScale(50.0f);
+	gWallTwo->SetPosition({ 30, 20, 60 });
+	gWallTwo->SetScale(50.0f);
 	gCrate->SetPosition({ -10, 0, 90 });
 	gCrate->SetRotation({ 0.0f, ToRadians(40.0f), 0.0f });
 	gCrate->SetScale(6.0f);
 	gStars->SetScale(8000.0f);
+	gLargeWindow->SetPosition({ 10,17,-10 });
+	gSmallWindow1->SetPosition({ -12,17,60 });
+	gSmallWindow2->SetPosition({ 0,17,60 });
+	gSmallWindow3->SetPosition({ 17,17,60 });
+	gSmallWindow4->SetPosition({ 34,17,60 });
 
 
 	// Light set-up - using an array this time
@@ -498,12 +603,22 @@ bool InitScene()
 	ModelStruct MS;
 	MS.Set(gCube, "Cube");
 	ModelVector.push_back(MS);
-	MS.Set(gCrate, "Create");
-	ModelVector.push_back(MS);
 	MS.Set(gLights[0].model, "Light_1");
 	ModelVector.push_back(MS);
 	MS.Set(gLights[1].model, "Light_2");
 	ModelVector.push_back(MS);
+	MS.Set(gLargeWindow, "LargeWindow");
+	ModelVector.push_back(MS);
+	MS.Set(gSmallWindow1, "SmallWindow1");
+	ModelVector.push_back(MS);
+	MS.Set(gSmallWindow2, "SmallWindow2");
+	ModelVector.push_back(MS);
+	MS.Set(gSmallWindow3, "SmallWindow3");
+	ModelVector.push_back(MS);
+	MS.Set(gSmallWindow4, "SmallWindow4");
+	ModelVector.push_back(MS);
+
+	WindowPostProcessSetUp();
 
 	return true;
 }
@@ -539,6 +654,10 @@ void ReleaseResources()
 	if (gGroundDiffuseSpecularMap)     gGroundDiffuseSpecularMap->Release();
 	if (gStarsDiffuseSpecularMapSRV)   gStarsDiffuseSpecularMapSRV->Release();
 	if (gStarsDiffuseSpecularMap)      gStarsDiffuseSpecularMap->Release();
+	if (gWallTwoDiffuseSpecularMapSRV) gWallTwoDiffuseSpecularMapSRV->Release();
+	if (gWallTwoDiffuseSpecularMap)    gWallTwoDiffuseSpecularMap->Release();
+	if (gWallOneDiffuseSpecularMapSRV) gWallOneDiffuseSpecularMapSRV->Release();
+	if (gWallOneDiffuseSpecularMap)    gWallOneDiffuseSpecularMap->Release();
 
 	if (gPostProcessingConstantBuffer)  gPostProcessingConstantBuffer->Release();
 	if (gPerModelConstantBuffer)        gPerModelConstantBuffer->Release();
@@ -556,7 +675,16 @@ void ReleaseResources()
 	delete gCube;    gCube = nullptr;
 	delete gGround;  gGround = nullptr;
 	delete gStars;   gStars = nullptr;
+	delete gWallOne; gWallOne = nullptr;
+	delete gWallTwo; gWallTwo = nullptr;
 
+	delete gWallOneMesh; gWallOneMesh = nullptr;
+	delete gWallTwoMesh; gWallTwoMesh = nullptr;
+	delete gLargeWindow; gLargeWindow = nullptr;
+	delete gSmallWindow1; gSmallWindow1 = nullptr;
+	delete gSmallWindow2; gSmallWindow2 = nullptr;
+	delete gSmallWindow3; gSmallWindow3 = nullptr;
+	delete gSmallWindow4; gSmallWindow4 = nullptr;
 	delete gLightMesh;   gLightMesh = nullptr;
 	delete gCrateMesh;   gCrateMesh = nullptr;
 	delete gCubeMesh;    gCubeMesh = nullptr;
@@ -608,6 +736,10 @@ void RenderSceneFromCamera(Camera* camera)
 
 	gD3DContext->PSSetShaderResources(0, 1, &gCrateDiffuseSpecularMapSRV); // First parameter must match texture slot number in the shader
 	gCrate->Render();
+	gD3DContext->PSSetShaderResources(0, 1, &gWallOneDiffuseSpecularMapSRV); // First parameter must match texture slot number in the shader
+	gWallOne->Render();
+	gD3DContext->PSSetShaderResources(0, 1, &gWallTwoDiffuseSpecularMapSRV); // First parameter must match texture slot number in the shader
+	gWallTwo->Render();
 
 	gD3DContext->PSSetShaderResources(0, 1, &gCubeDiffuseSpecularMapSRV); // First parameter must match texture slot number in the shader
 	gCube->Render();
@@ -668,13 +800,27 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	{
 		gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
 	}
+	else if (postProcess == PostProcess::NightVision)
+	{
+		gD3DContext->PSSetShader(gNightVisionPostProcess, nullptr, 0);
+	}
 	else if (postProcess == PostProcess::Blur)
 	{
+		//FilterCreation(GKernel);
+		//for (int i = 0; i < 3; i++)
+		//{
+		//	gPostProcessingConstants.WeightArray[i] = GKernel[i];
+		//}
 		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
 		gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
 	}
 	else if (postProcess == PostProcess::SecondBlur)
 	{
+		//FilterCreation(GKernel);
+		//for (int i = 0; i < 3; i++)
+		//{
+		//	gPostProcessingConstants.WeightArray[i] = GKernel[i];
+		//}
 		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
 		gD3DContext->PSSetShader(gSecondBlurPostProcess, nullptr, 0);
 	}
@@ -1053,13 +1199,21 @@ void RenderScene()
 	{
 		for (int i = 0; i < PostProcessingVector.size(); i++)
 		{
+			if (PostProcessingVector[i].Mod == gLargeWindow || PostProcessingVector[i].Mod == gSmallWindow1 || PostProcessingVector[i].Mod == gSmallWindow2 ||
+				PostProcessingVector[i].Mod == gSmallWindow3 || PostProcessingVector[i].Mod == gSmallWindow4)
+			{
+				if (PostProcessingVector[i].PostProcessingMode != PostProcessMode::Fullscreen)
+				{
+					PostProcessingVector[i].PostProcessingMode = PostProcessMode::ModelPolygon;
+				}
+			}
 			if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Fullscreen)
 			{
 				FullScreenPostProcess(PostProcessingVector[i].PP);
 				Counter++;
 			}
-			
-		
+
+
 			if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Area)
 			{
 				// Pass a 3D point for the centre of the affected area and the size of the (rectangular) area in world units
@@ -1070,7 +1224,7 @@ void RenderScene()
 			else if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::Polygon)
 			{
 				// An array of four points in world space - a tapered square centred at the origin
-				const std::array<CVector3, 4> points = { { {-3,5,0}, {-5,-5,0}, {3,5,0}, {5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
+				const std::array<CVector3, 4> points = { { {-5, 5,0}, {-5,-5,0}, {5,5,0},{5,-5,0} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
 
 				// A rotating matrix placing the model above in the scene
 				static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
@@ -1082,10 +1236,29 @@ void RenderScene()
 
 
 			}
+
+			else if (PostProcessingVector[i].PostProcessingMode == PostProcessMode::ModelPolygon)
+			{
+				// An array of four points in world space - a tapered square centred at the origin
+				const std::array<CVector3, 4> points = { { {PostProcessingVector[i].Mod->Position().x - 7, PostProcessingVector[i].Mod->Position().y + 7,PostProcessingVector[i].Mod->Position().z},
+														   {PostProcessingVector[i].Mod->Position().x - 7,PostProcessingVector[i].Mod->Position().y - 7,PostProcessingVector[i].Mod->Position().z},
+														   {PostProcessingVector[i].Mod->Position().x + 7,PostProcessingVector[i].Mod->Position().y + 7,PostProcessingVector[i].Mod->Position().z},
+														   {PostProcessingVector[i].Mod->Position().x + 7, PostProcessingVector[i].Mod->Position().y - 7,PostProcessingVector[i].Mod->Position().z} } }; // C++ strangely needs an extra pair of {} here... only for std:array...
+
+				// A rotating matrix placing the model above in the scene
+				static CMatrix4x4 polyMatrix = MatrixTranslation({ 20, 15, 0 });
+				//polyMatrix = MatrixRotationY(ToRadians(1)) * polyMatrix;
+
+				// Pass an array of 4 points and a matrix. Only supports 4 points.
+				PolygonPostProcess(PostProcessingVector[i].PP, points, polyMatrix);
+				Counter++;
+
+
+			}
 		}
-			Counter = 0;
-		
-		
+		Counter = 0;
+
+
 
 		// These lines unbind the scene texture from the pixel shader to stop DirectX issuing a warning when we try to render to it again next frame
 		ID3D11ShaderResourceView* nullSRV = nullptr;
@@ -1101,11 +1274,30 @@ void RenderScene()
 
 	ImGui::Begin("Model & Screen_Mode Selection", 0, ImGuiWindowFlags_AlwaysAutoResize);
 	int i = 0;
-	for (std::vector<ModelStruct>::iterator it = ModelVector.begin(); it != ModelVector.end(); ++it) {
+	ImGui::Text("Useable models for *Area* PostProcessers");
+	for (std::vector<ModelStruct>::iterator it = ModelVector.begin(); it != ModelVector.end() - 5; ++it) {
 		std::string HashTag = "##" + std::to_string(i);
 		if (ImGui::Selectable(HashTag.c_str(), i == Selected_Item))
 		{
 			Selected_Item = i;
+			Selected_Screen = 1;
+			gCurrentPostProcessMode = PostProcessMode::Area;
+		}
+
+		ImGui::SameLine();
+		ImGui::Text("Model: ");
+		ImGui::SameLine();
+		ImGui::Text((*it).Name.c_str());
+		i++;
+	}
+	ImGui::Text("Useable models for *ModelPolygon* PostProcessers");
+	for (std::vector<ModelStruct>::iterator it = ModelVector.begin() + 3; it != ModelVector.end(); ++it) {
+		std::string HashTag = "##" + std::to_string(i);
+		if (ImGui::Selectable(HashTag.c_str(), i == Selected_Item))
+		{
+			Selected_Item = i;
+			Selected_Screen = 3;
+			gCurrentPostProcessMode = PostProcessMode::ModelPolygon;
 		}
 
 		ImGui::SameLine();
@@ -1119,23 +1311,12 @@ void RenderScene()
 		Selected_Screen = 0;
 		gCurrentPostProcessMode = PostProcessMode::Fullscreen;
 	}
-	if (ImGui::Button("Area", ImVec2(130, 20)))
-	{
-		Selected_Screen = 1;
-		gCurrentPostProcessMode = PostProcessMode::Area;
-	}
-	if (ImGui::Button("Polygon", ImVec2(130, 20)))
-	{
-		Selected_Screen = 2;
-		gCurrentPostProcessMode = PostProcessMode::Polygon;
-	}
 	ImGui::Text("Current Screen Mode: ");
 	ImGui::SameLine();
 	ImGui::Text(ModeNames[Selected_Screen]);
 	ImGui::End();
 
 	ImGui::Begin("PostProcessingWindow", 0, ImGuiWindowFlags_AlwaysAutoResize);
-	//ImGui::Button("Tint");
 	if (ImGui::BeginMenu("PostProcessers"))
 	{
 		if (ImGui::Button("Tint", ImVec2(100, 20))) {
@@ -1224,6 +1405,13 @@ void RenderScene()
 			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
 			PostProcessingVector.push_back(PPNM);
 		}
+		if (ImGui::Button("NightVision", ImVec2(100, 20))) {
+			gCurrentPostProcess = PostProcess::NightVision;
+			PostProcessingDataVector.push_back({});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
 		ImGui::SameLine();
 		ImGui::EndMenu();
 	}
@@ -1273,7 +1461,7 @@ void RenderScene()
 		if (ModeNames[(int)PostProcessingVector[i].PostProcessingMode] == "FullScreen")
 		{
 			ImGui::Text("");
-			
+
 		}
 		else
 		{
@@ -1307,6 +1495,7 @@ void RenderScene()
 			ImGui::SameLine();
 			if (ImGui::BeginMenu("Blur Properties"))
 			{
+
 				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
 				ImGui::EndMenu();
 			}
@@ -1341,11 +1530,8 @@ void RenderScene()
 		ImGui::PopID();
 
 	}
-
-
-	//ImGui::EndMenu();
 	ImGui::End();
-	
+
 
 	//*******************************
 
@@ -1376,15 +1562,6 @@ void RenderScene()
 void UpdateScene(float frameTime)
 {
 	FrameTime = frameTime;
-
-	//***********
-
-	//// Select post process on keys
-	//if (KeyHit(Key_F1))  gCurrentPostProcessMode = PostProcessMode::Fullscreen;
-	//if (KeyHit(Key_F2))  gCurrentPostProcessMode = PostProcessMode::Area;
-	//if (KeyHit(Key_F3))  gCurrentPostProcessMode = PostProcessMode::Polygon;
-
-
 
 	// Post processing settings - all data for post-processes is updated every frame whether in use or not (minimal cost)
 

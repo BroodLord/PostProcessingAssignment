@@ -28,6 +28,7 @@ ID3D11PixelShader*    gPixelLightingPixelShader   = nullptr;
 ID3D11VertexShader* g2DQuadVertexShader    = nullptr;
 ID3D11VertexShader* g2DPolygonVertexShader = nullptr;
 ID3D11PixelShader*  gCopyPostProcess       = nullptr;
+ID3D11PixelShader*  gNightVisionPostProcess = nullptr;
 ID3D11PixelShader*  gTintPostProcess       = nullptr;
 ID3D11PixelShader*  gTintHuePostProcess    = nullptr;
 ID3D11PixelShader*  gGreyNoisePostProcess  = nullptr;
@@ -62,6 +63,7 @@ bool LoadShaders()
 	g2DPolygonVertexShader = LoadVertexShader("2DPolygon_pp");
 	g2DQuadVertexShader    = LoadVertexShader("2DQuad_pp");
 	gCopyPostProcess       = LoadPixelShader ("Copy_pp");
+	gNightVisionPostProcess = LoadPixelShader("NightVision_pp");
 	gTintPostProcess       = LoadPixelShader ("Tint_pp");
 	gTintHuePostProcess	   = LoadPixelShader("TintHue");
 	gGreyNoisePostProcess  = LoadPixelShader ("GreyNoise_pp");
@@ -75,6 +77,7 @@ bool LoadShaders()
 
 	if (gBasicTransformVertexShader == nullptr || gPixelLightingVertexShader == nullptr ||
 		gTintedTexturePixelShader   == nullptr || gPixelLightingPixelShader  == nullptr ||
+		gNightVisionPostProcess     == nullptr || gNightVisionPostProcess    == nullptr ||
 		g2DQuadVertexShader         == nullptr || gCopyPostProcess           == nullptr ||
 		gTintPostProcess            == nullptr || gHeatHazePostProcess       == nullptr ||
 		gGreyNoisePostProcess       == nullptr || gBurnPostProcess           == nullptr ||
@@ -101,6 +104,7 @@ void ReleaseShaders()
 	if (gUnderwaterPostProcess)       gUnderwaterPostProcess     ->Release();
 	if (gBurnPostProcess)             gBurnPostProcess           ->Release();
 	if (gGreyNoisePostProcess)        gGreyNoisePostProcess      ->Release();
+	if (gNightVisionPostProcess)      gNightVisionPostProcess    ->Release();
 	if (gTintPostProcess)             gTintPostProcess           ->Release();
 	if (gCopyPostProcess)             gCopyPostProcess           ->Release();
 	if (g2DPolygonVertexShader)       g2DPolygonVertexShader     ->Release();

@@ -26,6 +26,7 @@ extern ID3D11PixelShader*    gPixelLightingPixelShader;
 extern ID3D11VertexShader* g2DQuadVertexShader;
 extern ID3D11VertexShader* g2DPolygonVertexShader;
 extern ID3D11PixelShader*  gCopyPostProcess;
+extern ID3D11PixelShader* gNightVisionPostProcess;
 extern ID3D11PixelShader*  gTintPostProcess;
 extern ID3D11PixelShader*  gTintHuePostProcess;
 extern ID3D11PixelShader*  gGreyNoisePostProcess;

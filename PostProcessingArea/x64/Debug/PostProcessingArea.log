@@ -1,2 +1,4 @@
-﻿  Scene.cpp
+﻿D:\Users\DKavanagh2\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(39,13-38): warning X3081: comma expression used where a vector constructor may have been intended
+  
+  compilation object save succeeded; see D:\Users\DKavanagh2\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\NightVision_pp.cso
   PostProcessingArea.vcxproj -> D:\Users\DKavanagh2\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe

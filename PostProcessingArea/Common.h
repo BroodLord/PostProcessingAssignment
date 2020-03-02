@@ -119,6 +119,8 @@ struct PostProcessingConstants
 	CVector4 polygon2DPoints[4]; // Four points of a polygon in 2D viewport space for polygon post-processing. Matrix transformations already done on C++ side
 
 
+	//float WeightArray[64];
+
 	// Tint post-process settings
 
 	CVector3 tintColour1;
@@ -131,6 +133,7 @@ struct PostProcessingConstants
 
 	int blurStrength;
 	float paddingBS;
+	//float paddingWA;
 
 	// Grey noise post-process settings
     CVector2 noiseScale;
