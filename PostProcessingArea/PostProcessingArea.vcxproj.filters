@@ -163,5 +163,23 @@
     <FxCompile Include="NightVision_pp.hlsl">
       <Filter>Post-Processing Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="PixelationShader_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Predator_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Inverse_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="BlackNWhite_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="SeeingWorlds1_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="SeeingWorlds2_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

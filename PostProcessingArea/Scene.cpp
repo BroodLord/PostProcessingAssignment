@@ -53,33 +53,41 @@ enum class PostProcess
 	Underwater,
 	HeatHaze,
 	NightVision,
+	Pixelation,
+	Predator,
+	Inverse,
+	BlackAndWhite,
+	SeeingWorlds,
+	SecondSeeingWorlds,
 };
 
-float GKernel[5];
-
 // Function to create Gaussian filter 
-void FilterCreation(float GKernel[5])
+void FilterCreation(float GKernel[301], int &SampleAmount)
 {
 	// intialising standard deviation to 1.0 
-	float sigma = 1.0;
+	float sigma = 40;
 	float r, s = 2.0 * sigma * sigma;
-
+	int HalfSampleAmount = (((SampleAmount - 1)) / 2 + 1);
 	// sum is for normalization 
 	float sum = 0.0;
-
 	// generating 5x5 kernel 
-	for (int x = -2; x <= 2; x++) {
+	for (int x = -HalfSampleAmount; x <= HalfSampleAmount; x++) {
 
 		r = sqrt(x * x);
-		GKernel[x + 2] = (exp(-(r * r) / s)) / (3.14 * s);
-		sum += GKernel[x + 2];
+		GKernel[x + HalfSampleAmount] = (exp(-(r * r) / s)) / (3.14 * s);
+		sum += GKernel[x + HalfSampleAmount];
 
 	}
 
 	// normalising the Kernel 
-	for (int i = 0; i < 5; ++i) {
+	for (int i = 0; i < SampleAmount; ++i) {
 
 		GKernel[i] /= sum;
+	}
+
+	if (SampleAmount % 2 == 0)
+	{
+		SampleAmount--;
 	}
 }
 
@@ -143,11 +151,17 @@ struct PostProcessData
 			float waterSpeed;
 			float padding; // As the GPU only allows padding of 4,8,16, not 12
 		}Water;
-
+		struct
+		{
+			float offset;
+			float padding; // As the GPU only allows padding of 4,8,16, not 12
+		}SeeingWorlds;
 	};
 };
 
 const char* PPNames[] = {
+
+	
 	"None",
 	"Copy",
 	"Tint",
@@ -160,7 +174,13 @@ const char* PPNames[] = {
 	"SecondBlur",
 	"Underwater",
 	"HeatHaze",
-	"NightVision"
+	"NightVision",
+	"Pixelation",
+	"Predator",
+	"Inverse",
+	"BlackAndWhite",
+	"SeeingWorlds",
+	"SecondSeeingWorlds",
 
 };
 
@@ -500,40 +520,36 @@ void WindowPostProcessSetUp()
 {
 	PostProcessingData2 PPNM;
 	PostProcessData PPD;
-	gCurrentPostProcess = PostProcess::Tint;
-	float tempTop[3] = { 0.3f,0.8f,0.0f };
-	float tempMid[3] = { 0.1f,0.5f,1.0f };
-	PPD.tint.tint(tempTop, tempMid);
+	gCurrentPostProcess = PostProcess::BlackAndWhite;
+	//float tempTop[3] = { 0.3f,0.8f,0.0f };
+	//float tempMid[3] = { 0.1f,0.5f,1.0f };
+	//PPD.tint.tint(tempTop, tempMid);
 	PostProcessingDataVector.push_back(PPD);
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gLargeWindow, "LargeWindow");
 	PostProcessingVector.push_back(PPNM);
 
-	gCurrentPostProcess = PostProcess::Blur;
-	PostProcessData Blur;
-	Blur.Blur.Blur(5);
-	PostProcessingDataVector.push_back(Blur);
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1");
-	PostProcessingVector.push_back(PPNM);
-	gCurrentPostProcess = PostProcess::SecondBlur;
-	PostProcessingDataVector.push_back({ Blur });
+	gCurrentPostProcess = PostProcess::Inverse;
+	PostProcessingDataVector.push_back({});
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1");
 	PostProcessingVector.push_back(PPNM);
 
-	gCurrentPostProcess = PostProcess::HeatHaze;
+
+	gCurrentPostProcess = PostProcess::NightVision;
 	PostProcessingDataVector.push_back({});
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow2, "SmallWindow2");
 	PostProcessingVector.push_back(PPNM);
 
-	gCurrentPostProcess = PostProcess::GreyNoise;
-	PostProcessingDataVector.push_back({ 140.0f });
+	gCurrentPostProcess = PostProcess::Predator;
+	PostProcessingDataVector.push_back({});
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow3, "SmallWindow3");
 	PostProcessingVector.push_back(PPNM);
 
-	gCurrentPostProcess = PostProcess::TintHue;
-	float tempHue1[3] = { 0.3f,0.8f,0.0f };
-	float tempHue2[3] = { 0.1f,0.5f,1.0f };
-	PPD.Hue.Hue(tempHue1, tempHue2);
-	PostProcessingDataVector.push_back({ PPD });
+	gCurrentPostProcess = PostProcess::SeeingWorlds;
+	PostProcessingDataVector.push_back({0.05f});
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4");
+	PostProcessingVector.push_back(PPNM);
+	gCurrentPostProcess = PostProcess::SecondSeeingWorlds;
+	PostProcessingDataVector.push_back({0.05f});
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4");
 	PostProcessingVector.push_back(PPNM);
 }
@@ -800,29 +816,44 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	{
 		gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
 	}
+	else if (postProcess == PostProcess::Inverse)
+	{
+		gD3DContext->PSSetShader(gInversePostProcess, nullptr, 0);
+	}
+	else if (postProcess == PostProcess::Predator)
+	{
+		gD3DContext->PSSetShader(gPredatorPostProcess, nullptr, 0);
+	}
 	else if (postProcess == PostProcess::NightVision)
 	{
 		gD3DContext->PSSetShader(gNightVisionPostProcess, nullptr, 0);
 	}
 	else if (postProcess == PostProcess::Blur)
 	{
-		//FilterCreation(GKernel);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	gPostProcessingConstants.WeightArray[i] = GKernel[i];
-		//}
+		float GKernel[302];
+		FilterCreation(GKernel, PostProcessingDataVector[Counter].Blur.blur);
+		int HalfSampleAmount = (((PostProcessingDataVector[Counter].Blur.blur - 1)) / 2 + 1);
 		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
+		for (int i = 0; i < HalfSampleAmount; i++)
+		{
+			gPostProcessingConstants.WeightArray[i].x = GKernel[i];
+		}
 		gD3DContext->PSSetShader(gBlurPostProcess, nullptr, 0);
 	}
 	else if (postProcess == PostProcess::SecondBlur)
 	{
-		//FilterCreation(GKernel);
-		//for (int i = 0; i < 3; i++)
-		//{
-		//	gPostProcessingConstants.WeightArray[i] = GKernel[i];
-		//}
-		gPostProcessingConstants.blurStrength = PostProcessingDataVector[Counter].Blur.blur;
 		gD3DContext->PSSetShader(gSecondBlurPostProcess, nullptr, 0);
+	}
+	else if (postProcess == PostProcess::BlackAndWhite)
+	{
+		gD3DContext->PSSetShader(gBlackAndWhitePostProcess, nullptr, 0);
+	}
+	else if (postProcess == PostProcess::SeeingWorlds)
+	{
+		gPostProcessingConstants.ITime += FrameTime;
+		gPostProcessingConstants.OffSet = PostProcessingDataVector[Counter].SeeingWorlds.offset;
+		gD3DContext->PSSetShader(gSeeingWorldsPostProcess, nullptr, 0);
+		gD3DContext->PSSetShader(gSecondSeeingWorldsPostProcess, nullptr, 0);
 	}
 	else if (postProcess == PostProcess::Underwater)
 	{
@@ -830,7 +861,10 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 		gD3DContext->PSSetShader(gUnderwaterPostProcess, nullptr, 0);
 
 	}
-
+	else if (postProcess == PostProcess::Pixelation)
+	{
+		gD3DContext->PSSetShader(gPixelationPostProcess, nullptr, 0);
+	}
 	else if (postProcess == PostProcess::Tint)
 	{
 
@@ -1364,6 +1398,14 @@ void RenderScene()
 			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
 			PostProcessingVector.push_back(PPNM);
 		}
+		if (ImGui::Button("Inverse", ImVec2(100, 20)))
+		{
+			gCurrentPostProcess = PostProcess::Inverse;
+			PostProcessingDataVector.push_back({});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
 		if (ImGui::Button("Distort", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Distort;
@@ -1397,6 +1439,18 @@ void RenderScene()
 			PostProcessingVector.push_back(PPNM);
 
 		}
+		if (ImGui::Button("SeeingWorlds", ImVec2(100, 20)))
+		{
+			gCurrentPostProcess = PostProcess::SeeingWorlds;
+			PostProcessingDataVector.push_back({0.05});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+			gCurrentPostProcess = PostProcess::SecondSeeingWorlds;
+			PostProcessingDataVector.push_back({0.05});
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
 		if (ImGui::Button("Underwater", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Underwater;
@@ -1407,6 +1461,20 @@ void RenderScene()
 		}
 		if (ImGui::Button("NightVision", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::NightVision;
+			PostProcessingDataVector.push_back({});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
+		if (ImGui::Button("Pixelation", ImVec2(100, 20))) {
+			gCurrentPostProcess = PostProcess::Pixelation;
+			PostProcessingDataVector.push_back({});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
+		if (ImGui::Button("Predator", ImVec2(100, 20))) {
+			gCurrentPostProcess = PostProcess::Predator;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
 			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
@@ -1427,31 +1495,35 @@ void RenderScene()
 	{
 
 		ImGui::PushID(i);
-		if (PPNames[(int)PostProcessingVector[i].PP] != "SecondBlur")
+		if (PPNames[(int)PostProcessingVector[i].PP] != "SecondBlur") //)
 		{
-			if (ImGui::Button("x", ImVec2(15, 20)))
+			if (PPNames[(int)PostProcessingVector[i].PP] != "SecondSeeingWorlds")
 			{
-
-				if (PPNames[(int)PostProcessingVector[i].PP] == "Blur")
+				if (ImGui::Button("x", ImVec2(15, 20)))
 				{
-					PostProcessingVector.erase(PostProcessingVector.begin() + i);
-					PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
-					PostProcessingVector.erase(PostProcessingVector.begin() + (i));
-					PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
-					ImGui::PopID();
-				}
-				else
-				{
-					PostProcessingVector.erase(PostProcessingVector.begin() + i);
-					PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
-					ImGui::PopID();
 
+					if (PPNames[(int)PostProcessingVector[i].PP] == "Blur" || PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+					{
+						PostProcessingVector.erase(PostProcessingVector.begin() + i);
+						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+						PostProcessingVector.erase(PostProcessingVector.begin() + (i));
+						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
+						ImGui::PopID();
+					}
+					else
+					{
+						PostProcessingVector.erase(PostProcessingVector.begin() + i);
+						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+						ImGui::PopID();
+
+					}
+					break;
 				}
-				break;
+
+				ImGui::SameLine();
 			}
-
-			ImGui::SameLine();
 		}
+		
 		ImGui::Text(PPNames[(int)PostProcessingVector[i].PP]);
 		ImGui::SameLine();
 		ImGui::Text("(");
@@ -1490,25 +1562,34 @@ void RenderScene()
 				ImGui::EndMenu();
 			}
 		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("SeeingWorlds Properties"))
+			{
+				ImGui::SliderFloat("Offset", &PostProcessingDataVector[i].SeeingWorlds.offset, 0.01f, 0.09f);
+				ImGui::EndMenu();
+			}
+		}
 		if (PPNames[(int)PostProcessingVector[i].PP] == "Blur")
 		{
 			ImGui::SameLine();
 			if (ImGui::BeginMenu("Blur Properties"))
 			{
 
-				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
+				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 1, 151);
 				ImGui::EndMenu();
 			}
 		}
-		if (PPNames[(int)PostProcessingVector[i].PP] == "SecondBlur")
-		{
-			ImGui::SameLine();
-			if (ImGui::BeginMenu("SecondBlur Properties"))
-			{
-				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
-				ImGui::EndMenu();
-			}
-		}
+		//if (PPNames[(int)PostProcessingVector[i].PP] == "SecondBlur")
+		//{
+		//	ImGui::SameLine();
+		//	if (ImGui::BeginMenu("SecondBlur Properties"))
+		//	{
+		//		ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 0, 20);
+		//		ImGui::EndMenu();
+		//	}
+		//}
 		if (PPNames[(int)PostProcessingVector[i].PP] == "GreyNoise")
 		{
 			ImGui::SameLine();
@@ -1577,6 +1658,7 @@ void UpdateScene(float frameTime)
 	static float HueSpeed = 0.5f;
 
 	gPostProcessingConstants.HueLevel += frameTime;
+
 
 	gPostProcessingConstants.WaterLevel += WaterSpeed * frameTime;
 

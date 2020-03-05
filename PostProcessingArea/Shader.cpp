@@ -29,16 +29,24 @@ ID3D11VertexShader* g2DQuadVertexShader    = nullptr;
 ID3D11VertexShader* g2DPolygonVertexShader = nullptr;
 ID3D11PixelShader*  gCopyPostProcess       = nullptr;
 ID3D11PixelShader*  gNightVisionPostProcess = nullptr;
+ID3D11PixelShader*  gPredatorPostProcess    = nullptr;
 ID3D11PixelShader*  gTintPostProcess       = nullptr;
 ID3D11PixelShader*  gTintHuePostProcess    = nullptr;
+ID3D11PixelShader*  gInversePostProcess = nullptr;
 ID3D11PixelShader*  gGreyNoisePostProcess  = nullptr;
 ID3D11PixelShader*  gBurnPostProcess       = nullptr;
 ID3D11PixelShader*  gDistortPostProcess    = nullptr;
 ID3D11PixelShader*  gSpiralPostProcess     = nullptr;
 ID3D11PixelShader*  gHeatHazePostProcess   = nullptr;
 ID3D11PixelShader* gUnderwaterPostProcess = nullptr;
+ID3D11PixelShader* gBlackAndWhitePostProcess = nullptr;
+ID3D11PixelShader* gSeeingWorldsPostProcess = nullptr;
+ID3D11PixelShader* gSecondSeeingWorldsPostProcess = nullptr;
 ID3D11PixelShader* gBlurPostProcess = nullptr;
+ID3D11PixelShader* gPixelationPostProcess = nullptr;
 ID3D11PixelShader* gSecondBlurPostProcess = nullptr;
+//ID3D11PixelShader* gPredatorPostProcess = nullptr;
+
 
 
 
@@ -66,6 +74,7 @@ bool LoadShaders()
 	gNightVisionPostProcess = LoadPixelShader("NightVision_pp");
 	gTintPostProcess       = LoadPixelShader ("Tint_pp");
 	gTintHuePostProcess	   = LoadPixelShader("TintHue");
+	gInversePostProcess    = LoadPixelShader("Inverse_pp");
 	gGreyNoisePostProcess  = LoadPixelShader ("GreyNoise_pp");
 	gBurnPostProcess       = LoadPixelShader ("Burn_pp");
 	gDistortPostProcess    = LoadPixelShader ("Distort_pp");
@@ -74,6 +83,11 @@ bool LoadShaders()
 	gSecondBlurPostProcess = LoadPixelShader ("SecondBlur");
 	gBlurPostProcess = LoadPixelShader("Blur_pp");
 	gUnderwaterPostProcess = LoadPixelShader("Underwater_pp");
+	gBlackAndWhitePostProcess = LoadPixelShader("BlackNWhite_pp");
+	gPixelationPostProcess = LoadPixelShader("PixelationShader_pp");
+	gPredatorPostProcess = LoadPixelShader("Predator_pp");
+	gSeeingWorldsPostProcess = LoadPixelShader("SeeingWorlds1_pp");
+	gSecondSeeingWorldsPostProcess = LoadPixelShader("SeeingWorlds2_pp");
 
 	if (gBasicTransformVertexShader == nullptr || gPixelLightingVertexShader == nullptr ||
 		gTintedTexturePixelShader   == nullptr || gPixelLightingPixelShader  == nullptr ||
@@ -84,7 +98,10 @@ bool LoadShaders()
 		gDistortPostProcess         == nullptr || gSpiralPostProcess         == nullptr ||
 		g2DPolygonVertexShader      == nullptr || gBlurPostProcess			 == nullptr || 
 		gUnderwaterPostProcess		== nullptr || gTintHuePostProcess        == nullptr ||
-		gSecondBlurPostProcess      == nullptr)
+		gSecondBlurPostProcess      == nullptr || gPixelationPostProcess     == nullptr ||
+		gPredatorPostProcess        == nullptr || gInversePostProcess        == nullptr ||
+		gBlackAndWhitePostProcess   == nullptr || gSeeingWorldsPostProcess   == nullptr ||
+		gSecondSeeingWorldsPostProcess == nullptr)
 	{
 		gLastError = "Error loading shaders";
 		return false;
@@ -100,6 +117,7 @@ void ReleaseShaders()
 	if (gSecondBlurPostProcess)       gSecondBlurPostProcess     ->Release();
 	if (gSpiralPostProcess)           gSpiralPostProcess         ->Release();
 	if (gDistortPostProcess)          gDistortPostProcess        ->Release();
+	if (gPredatorPostProcess)		  gPredatorPostProcess       ->Release();
 	if (gBlurPostProcess)             gBlurPostProcess			 ->Release();
 	if (gUnderwaterPostProcess)       gUnderwaterPostProcess     ->Release();
 	if (gBurnPostProcess)             gBurnPostProcess           ->Release();
@@ -114,6 +132,11 @@ void ReleaseShaders()
 	if (gTintedTexturePixelShader)    gTintedTexturePixelShader  ->Release();
 	if (gPixelLightingVertexShader)   gPixelLightingVertexShader ->Release();
 	if (gBasicTransformVertexShader)  gBasicTransformVertexShader->Release();
+	if (gPixelationPostProcess)       gPixelationPostProcess     ->Release();
+	if (gInversePostProcess)          gInversePostProcess        ->Release();
+	if (gBlackAndWhitePostProcess)    gBlackAndWhitePostProcess  ->Release();
+	if (gSeeingWorldsPostProcess)     gSeeingWorldsPostProcess   ->Release();
+	if (gSecondSeeingWorldsPostProcess) gSecondSeeingWorldsPostProcess->Release();
 }
 
 

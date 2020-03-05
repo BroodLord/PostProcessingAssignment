@@ -28,7 +28,10 @@ extern ID3D11VertexShader* g2DPolygonVertexShader;
 extern ID3D11PixelShader*  gCopyPostProcess;
 extern ID3D11PixelShader* gNightVisionPostProcess;
 extern ID3D11PixelShader*  gTintPostProcess;
+extern ID3D11PixelShader* gPredatorPostProcess;
 extern ID3D11PixelShader*  gTintHuePostProcess;
+extern ID3D11PixelShader* gInversePostProcess;
+extern ID3D11PixelShader*  gPixelationPostProcess;
 extern ID3D11PixelShader*  gGreyNoisePostProcess;
 extern ID3D11PixelShader*  gBurnPostProcess;
 extern ID3D11PixelShader*  gDistortPostProcess;
@@ -37,6 +40,9 @@ extern ID3D11PixelShader*  gHeatHazePostProcess;
 extern ID3D11PixelShader* gBlurPostProcess;
 extern ID3D11PixelShader* gSecondBlurPostProcess;
 extern ID3D11PixelShader* gUnderwaterPostProcess;
+extern ID3D11PixelShader* gBlackAndWhitePostProcess;
+extern ID3D11PixelShader* gSeeingWorldsPostProcess;
+extern ID3D11PixelShader* gSecondSeeingWorldsPostProcess;
 
 
 

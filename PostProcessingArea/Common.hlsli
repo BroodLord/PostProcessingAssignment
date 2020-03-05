@@ -129,7 +129,7 @@ cbuffer PostProcessingConstants : register(b1)
 
   	float4 gPolygon2DPoints[4]; // Four points of a polygon in 2D viewport space for polygon post-processing. Matrix transformations already done on C++ side
 
-    //float4 gWeightArray[64];
+    float4 gWeightArray[301];
 
 	// Tint post-process settings
 	float3 gTintColour1;
@@ -141,6 +141,12 @@ cbuffer PostProcessingConstants : register(b1)
 
     float gHueLevel;
     float paddingHL;
+    
+    float gITime;
+    float gpaddingIT;
+    
+    float gOffSet;
+    float gpaddingOS;
 
     int gblurStrength;
     float paddingBS;
