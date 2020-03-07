@@ -59,6 +59,8 @@ enum class PostProcess
 	BlackAndWhite,
 	SeeingWorlds,
 	SecondSeeingWorlds,
+	Bloom,
+	Merge,
 };
 
 // Function to create Gaussian filter 
@@ -181,6 +183,8 @@ const char* PPNames[] = {
 	"BlackAndWhite",
 	"SeeingWorlds",
 	"SecondSeeingWorlds",
+	"Bloom",
+	"Merge",
 
 };
 
@@ -355,8 +359,13 @@ ID3D11Texture2D* gBackTexture = nullptr; // This object represents the memory us
 ID3D11RenderTargetView* gBackRenderTarget = nullptr; // This object is used when we want to render to the texture above
 ID3D11ShaderResourceView* gBackTextureSRV = nullptr; // This object is used to give shaders access to the texture above (SRV = shader resource view)
 
+ID3D11Texture2D* gMergeTexture = nullptr; // This object represents the memory used by the texture on the GPU
+ID3D11RenderTargetView* gMergeTarget = nullptr;
+ID3D11ShaderResourceView* gMergeMapSRV = nullptr;
+
 
 // Additional textures used for specific post-processes
+
 ID3D11Resource* gNoiseMap = nullptr;
 ID3D11ShaderResourceView* gNoiseMapSRV = nullptr;
 ID3D11Resource* gBurnMap = nullptr;
@@ -481,6 +490,11 @@ bool InitGeometry()
 		gLastError = "Error creating scene texture";
 		return false;
 	}
+	if (FAILED(gD3DDevice->CreateTexture2D(&sceneTextureDesc, NULL, &gMergeTexture)))
+	{
+		gLastError = "Error creating scene texture";
+		return false;
+	}
 
 	// We created the scene texture above, now we get a "view" of it as a render target, i.e. get a special pointer to the texture that
 	// we use when rendering to it (see RenderScene function below)
@@ -494,6 +508,11 @@ bool InitGeometry()
 		gLastError = "Error creating scene render target view";
 		return false;
 	}
+	if (FAILED(gD3DDevice->CreateRenderTargetView(gMergeTexture, NULL, &gMergeTarget)))
+	{
+		gLastError = "Error creating scene render target view";
+		return false;
+	}
 
 	// We also need to send this texture (resource) to the shaders. To do that we must create a shader-resource "view"
 	D3D11_SHADER_RESOURCE_VIEW_DESC srDesc = {};
@@ -502,6 +521,11 @@ bool InitGeometry()
 	srDesc.Texture2D.MostDetailedMip = 0;
 	srDesc.Texture2D.MipLevels = 1;
 	if (FAILED(gD3DDevice->CreateShaderResourceView(gSceneTexture, &srDesc, &gSceneTextureSRV)))
+	{
+		gLastError = "Error creating scene shader resource view";
+		return false;
+	}
+	if (FAILED(gD3DDevice->CreateShaderResourceView(gMergeTexture, &srDesc, &gMergeMapSRV)))
 	{
 		gLastError = "Error creating scene shader resource view";
 		return false;
@@ -521,9 +545,6 @@ void WindowPostProcessSetUp()
 	PostProcessingData2 PPNM;
 	PostProcessData PPD;
 	gCurrentPostProcess = PostProcess::BlackAndWhite;
-	//float tempTop[3] = { 0.3f,0.8f,0.0f };
-	//float tempMid[3] = { 0.1f,0.5f,1.0f };
-	//PPD.tint.tint(tempTop, tempMid);
 	PostProcessingDataVector.push_back(PPD);
 	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gLargeWindow, "LargeWindow");
 	PostProcessingVector.push_back(PPNM);
@@ -648,6 +669,10 @@ void ReleaseResources()
 	if (gSceneTextureSRV)              gSceneTextureSRV->Release();
 	if (gSceneRenderTarget)            gSceneRenderTarget->Release();
 	if (gSceneTexture)                 gSceneTexture->Release();
+
+	if (gMergeMapSRV)                  gMergeMapSRV->Release();
+	if (gMergeTarget)                  gMergeTarget->Release();
+	if (gMergeTexture)                 gMergeTexture->Release();
 
 	if (gBackTextureSRV)			   gBackTextureSRV->Release();
 	if (gBackRenderTarget)			   gBackRenderTarget->Release();
@@ -815,6 +840,18 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	if (postProcess == PostProcess::Copy)
 	{
 		gD3DContext->PSSetShader(gCopyPostProcess, nullptr, 0);
+	}
+	else if (postProcess == PostProcess::Bloom)
+	{
+		gD3DContext->PSSetShader(gBloomPostProcess, nullptr, 0);
+		
+	}
+	else if (postProcess == PostProcess::Merge)
+	{
+		gD3DContext->PSSetShaderResources(1, 1, &gMergeMapSRV);
+	    gD3DContext->PSSetShader(gMergePostProcess, nullptr, 0);
+		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
+
 	}
 	else if (postProcess == PostProcess::Inverse)
 	{
@@ -1193,7 +1230,25 @@ void RenderScene()
 	gPerFrameConstants.viewportWidth = static_cast<float>(gViewportWidth);
 	gPerFrameConstants.viewportHeight = static_cast<float>(gViewportHeight);
 
+	if (PostProcessingVector.size() != 0)
+	{
+		gD3DContext->OMSetRenderTargets(1, &gMergeTarget, gDepthStencil);
+		gD3DContext->ClearRenderTargetView(gMergeTarget, &gBackgroundColor.r);
+		gD3DContext->ClearDepthStencilView(gDepthStencil, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	}
 
+	// Setup the viewport to the size of the main window
+	D3D11_VIEWPORT vp;
+	vp.Width = static_cast<FLOAT>(gViewportWidth);
+	vp.Height = static_cast<FLOAT>(gViewportHeight);
+	vp.MinDepth = 0.0f;
+	vp.MaxDepth = 1.0f;
+	vp.TopLeftX = 0;
+	vp.TopLeftY = 0;
+	gD3DContext->RSSetViewports(1, &vp);
+
+	// Render the scene from the main camera
+	RenderSceneFromCamera(gCamera);
 
 	////--------------- Main scene rendering ---------------////
 
@@ -1213,7 +1268,7 @@ void RenderScene()
 	gD3DContext->ClearDepthStencilView(gDepthStencil, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
 	// Setup the viewport to the size of the main window
-	D3D11_VIEWPORT vp;
+	//D3D11_VIEWPORT vp;
 	vp.Width = static_cast<FLOAT>(gViewportWidth);
 	vp.Height = static_cast<FLOAT>(gViewportHeight);
 	vp.MinDepth = 0.0f;
@@ -1390,6 +1445,29 @@ void RenderScene()
 			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
 			PostProcessingVector.push_back(PPNM);
 		}
+		if (ImGui::Button("Bloom", ImVec2(100, 20)))
+		{
+			PostProcessingData2 PPNM;
+			PostProcessData PPD;
+			gCurrentPostProcess = PostProcess::Bloom;
+			PostProcessingDataVector.push_back({});
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+			gCurrentPostProcess = PostProcess::Blur;
+			PostProcessData Blur;
+			Blur.Blur.Blur(30);
+			PostProcessingDataVector.push_back(Blur);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+			gCurrentPostProcess = PostProcess::SecondBlur;
+			PostProcessingDataVector.push_back({ Blur });
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+			gCurrentPostProcess = PostProcess::Merge;
+			PostProcessingDataVector.push_back({});
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
 		if (ImGui::Button("Burn", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::Burn;
@@ -1480,6 +1558,13 @@ void RenderScene()
 			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
 			PostProcessingVector.push_back(PPNM);
 		}
+		if (ImGui::Button("Black&White", ImVec2(100, 20))) {
+			gCurrentPostProcess = PostProcess::BlackAndWhite;
+			PostProcessingDataVector.push_back({});
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingVector.push_back(PPNM);
+		}
 		ImGui::SameLine();
 		ImGui::EndMenu();
 	}
@@ -1490,6 +1575,7 @@ void RenderScene()
 		PostProcessingDataVector.clear();
 	}
 
+	bool Gloom = false;
 	ImGui::Text("Active Postprocessers");
 	for (int i = 0; i < PostProcessingVector.size(); i++)
 	{
@@ -1499,28 +1585,51 @@ void RenderScene()
 		{
 			if (PPNames[(int)PostProcessingVector[i].PP] != "SecondSeeingWorlds")
 			{
-				if (ImGui::Button("x", ImVec2(15, 20)))
+				if (PPNames[(int)PostProcessingVector[i].PP] != "Merge")
 				{
-
-					if (PPNames[(int)PostProcessingVector[i].PP] == "Blur" || PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+					if (!Gloom)
 					{
-						PostProcessingVector.erase(PostProcessingVector.begin() + i);
-						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
-						PostProcessingVector.erase(PostProcessingVector.begin() + (i));
-						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
-						ImGui::PopID();
+						if (ImGui::Button("x", ImVec2(15, 20)))
+						{
+
+							if (PPNames[(int)PostProcessingVector[i].PP] == "Blur" || PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+							{
+								PostProcessingVector.erase(PostProcessingVector.begin() + i);
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+								PostProcessingVector.erase(PostProcessingVector.begin() + (i));
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
+								ImGui::PopID();
+							}
+							else if (PPNames[(int)PostProcessingVector[i].PP] == "Bloom")
+							{
+								PostProcessingVector.erase(PostProcessingVector.begin() + i);
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+								PostProcessingVector.erase(PostProcessingVector.begin() + (i));
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
+								PostProcessingVector.erase(PostProcessingVector.begin() + i);
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+								PostProcessingVector.erase(PostProcessingVector.begin() + (i));
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + (i));
+
+								ImGui::PopID();
+							}
+							else
+							{
+								PostProcessingVector.erase(PostProcessingVector.begin() + i);
+								PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
+								ImGui::PopID();
+
+							}
+							break;
+						}
+						ImGui::SameLine();
 					}
 					else
 					{
-						PostProcessingVector.erase(PostProcessingVector.begin() + i);
-						PostProcessingDataVector.erase(PostProcessingDataVector.begin() + i);
-						ImGui::PopID();
-
+						Gloom = false;
 					}
-					break;
 				}
-
-				ImGui::SameLine();
+				
 			}
 		}
 		
@@ -1607,6 +1716,10 @@ void RenderScene()
 				ImGui::SliderFloat("BurnSpeed", &PostProcessingDataVector[i].Burn.burnSpeed, 0.0f, 2.0f);
 				ImGui::EndMenu();
 			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Bloom")
+		{
+			Gloom = true;
 		}
 		ImGui::PopID();
 

@@ -181,5 +181,11 @@
     <FxCompile Include="SeeingWorlds2_pp.hlsl">
       <Filter>Post-Processing Shaders</Filter>
     </FxCompile>
+    <FxCompile Include="Bloom_pp.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Merge.hlsl">
+      <Filter>Post-Processing Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>

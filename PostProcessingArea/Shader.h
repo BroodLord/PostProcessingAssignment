@@ -43,6 +43,9 @@ extern ID3D11PixelShader* gUnderwaterPostProcess;
 extern ID3D11PixelShader* gBlackAndWhitePostProcess;
 extern ID3D11PixelShader* gSeeingWorldsPostProcess;
 extern ID3D11PixelShader* gSecondSeeingWorldsPostProcess;
+extern ID3D11PixelShader* gBloomPostProcess;
+extern ID3D11PixelShader* gMergePostProcess;
+
 
 
 

@@ -1,5 +1,7 @@
-﻿D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\SeeingWorlds1_pp.hlsl(23,13-23): warning X3207: Initializer used on a global 'const' variable. This requires setting an external constant. If a literal is desired, use 'static const' instead.
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\SeeingWorlds1_pp.hlsl(24,13-21): warning X3207: Initializer used on a global 'const' variable. This requires setting an external constant. If a literal is desired, use 'static const' instead.
+﻿D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(26,25-32): warning X3081: comma expression used where a vector constructor may have been intended
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(26,25-37): warning X3081: comma expression used where a vector constructor may have been intended
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(40,11-81): warning X3206: implicit truncation of vector type
   
-  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\SeeingWorlds1_pp.cso
+  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.cso
+  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Predator_pp.cso
   PostProcessingArea.vcxproj -> D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe
