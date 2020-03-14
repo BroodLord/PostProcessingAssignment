@@ -23,7 +23,7 @@ SamplerState PointSample : register(s0); // We don't usually want to filter (bil
 // Post-processing shader that tints the scene texture to a given colour
 float4 main(PostProcessingInput input) : SV_Target
 {
-    const float EffectStrength = 0.02f;
+    const float EffectStrength = 0.01f;
 	
 	// Calculate alpha to display the effect in a softened circle, could use a texture rather than calculations for the same task.
 	// Uses the second set of area texture coordinates, which range from (0,0) to (1,1) over the area being processed

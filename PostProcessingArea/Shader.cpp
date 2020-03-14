@@ -47,6 +47,7 @@ ID3D11PixelShader* gPixelationPostProcess = nullptr;
 ID3D11PixelShader* gSecondBlurPostProcess = nullptr;
 ID3D11PixelShader* gBloomPostProcess = nullptr;
 ID3D11PixelShader* gMergePostProcess = nullptr;
+ID3D11PixelShader* gSigmoidPostProcess = nullptr;
 
 
 
@@ -91,6 +92,7 @@ bool LoadShaders()
 	gSecondSeeingWorldsPostProcess = LoadPixelShader("SeeingWorlds2_pp");
 	gBloomPostProcess = LoadPixelShader("Bloom_pp");
 	gMergePostProcess = LoadPixelShader("Merge");
+	gSigmoidPostProcess = LoadPixelShader("Sigmoid_pp");
 
 	if (gBasicTransformVertexShader == nullptr || gPixelLightingVertexShader == nullptr ||
 		gTintedTexturePixelShader   == nullptr || gPixelLightingPixelShader  == nullptr ||
@@ -105,7 +107,7 @@ bool LoadShaders()
 		gPredatorPostProcess        == nullptr || gInversePostProcess        == nullptr ||
 		gBlackAndWhitePostProcess   == nullptr || gSeeingWorldsPostProcess   == nullptr ||
 		gSecondSeeingWorldsPostProcess == nullptr || gBloomPostProcess       == nullptr ||
-		gMergePostProcess           == nullptr)
+		gMergePostProcess           == nullptr || gSigmoidPostProcess == nullptr)
 	{
 		gLastError = "Error loading shaders";
 		return false;
@@ -143,6 +145,7 @@ void ReleaseShaders()
 	if (gSecondSeeingWorldsPostProcess) gSecondSeeingWorldsPostProcess->Release();
 	if (gBloomPostProcess)            gBloomPostProcess          ->Release();
 	if (gMergePostProcess)            gMergePostProcess          ->Release();
+	if (gSigmoidPostProcess)          gSigmoidPostProcess        ->Release();
 	
 }
 

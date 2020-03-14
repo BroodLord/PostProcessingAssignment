@@ -29,7 +29,7 @@ float4 main(PostProcessingInput input) : SV_Target
    float2 centreVector = input.areaUV - float2(0.5, 0.5f);
    float centreLengthSq = dot(centreVector, centreVector);
          //{ 0.2270270270, 0.1945945946, 0.1216216216, 0.0540540541, 0.0162162162 };
-   float3 tc = float3(0.0, 0.0, 0.0);
+    float3 tc = float3(0.0, 0.0, 0.0);
     int Half = ((gblurStrength - 1) / 2 + 1);
     float3 ppColour = SceneTexture.Sample(PointSample, input.sceneUV) * gWeightArray[Half].x;
     

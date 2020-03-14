@@ -1,4 +1,4 @@
-//--------------------------------------------------------------------------------------
+﻿//--------------------------------------------------------------------------------------
 // Scene geometry and layout preparation
 // Scene rendering & update
 //--------------------------------------------------------------------------------------
@@ -54,17 +54,18 @@ enum class PostProcess
 	HeatHaze,
 	NightVision,
 	Pixelation,
-	Predator,
+	Scanlines,
 	Inverse,
 	BlackAndWhite,
 	SeeingWorlds,
 	SecondSeeingWorlds,
 	Bloom,
 	Merge,
+	Sigmoid,
 };
 
 // Function to create Gaussian filter 
-void FilterCreation(float GKernel[301], int &SampleAmount)
+void FilterCreation(float GKernel[301], int& SampleAmount)
 {
 	// intialising standard deviation to 1.0 
 	float sigma = 40;
@@ -150,6 +151,12 @@ struct PostProcessData
 		}Blur;
 		struct
 		{
+			float Gamma;
+			float padding; // As the GPU only allows padding of 4,8,16, not 12
+
+		}Sigmoid;
+		struct
+		{
 			float waterSpeed;
 			float padding; // As the GPU only allows padding of 4,8,16, not 12
 		}Water;
@@ -163,7 +170,7 @@ struct PostProcessData
 
 const char* PPNames[] = {
 
-	
+
 	"None",
 	"Copy",
 	"Tint",
@@ -178,13 +185,14 @@ const char* PPNames[] = {
 	"HeatHaze",
 	"NightVision",
 	"Pixelation",
-	"Predator",
+	"Scanlines",
 	"Inverse",
 	"BlackAndWhite",
 	"SeeingWorlds",
 	"SecondSeeingWorlds",
 	"Bloom",
 	"Merge",
+	"Sigmoid",
 
 };
 
@@ -219,14 +227,16 @@ struct PostProcessingData2
 {
 	Model* Mod;
 	std::string Name;
+	int NumberOfProcessors;
 	PostProcess PP;
 	PostProcessMode PostProcessingMode;
-	void Set(PostProcess P, PostProcessMode PM, Model* M, std::string N)
+	void Set(PostProcess P, PostProcessMode PM, Model* M, std::string N, int i)
 	{
 		Name = N;
 		Mod = M;
 		PP = P;
 		PostProcessingMode = PM;
+		NumberOfProcessors = i;
 
 	}
 };
@@ -546,32 +556,32 @@ void WindowPostProcessSetUp()
 	PostProcessData PPD;
 	gCurrentPostProcess = PostProcess::BlackAndWhite;
 	PostProcessingDataVector.push_back(PPD);
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gLargeWindow, "LargeWindow");
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gLargeWindow, "LargeWindow", 1);
 	PostProcessingVector.push_back(PPNM);
 
 	gCurrentPostProcess = PostProcess::Inverse;
 	PostProcessingDataVector.push_back({});
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1");
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow1, "SmallWindow1", 1);
 	PostProcessingVector.push_back(PPNM);
 
 
 	gCurrentPostProcess = PostProcess::NightVision;
 	PostProcessingDataVector.push_back({});
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow2, "SmallWindow2");
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow2, "SmallWindow2", 1);
 	PostProcessingVector.push_back(PPNM);
 
-	gCurrentPostProcess = PostProcess::Predator;
+	gCurrentPostProcess = PostProcess::Scanlines;
 	PostProcessingDataVector.push_back({});
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow3, "SmallWindow3");
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow3, "SmallWindow3", 1);
 	PostProcessingVector.push_back(PPNM);
 
 	gCurrentPostProcess = PostProcess::SeeingWorlds;
-	PostProcessingDataVector.push_back({0.05f});
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4");
+	PostProcessingDataVector.push_back({ 0.05f });
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4", 2);
 	PostProcessingVector.push_back(PPNM);
 	gCurrentPostProcess = PostProcess::SecondSeeingWorlds;
-	PostProcessingDataVector.push_back({0.05f});
-	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4");
+	PostProcessingDataVector.push_back({ 0.05f });
+	PPNM.Set(gCurrentPostProcess, PostProcessMode::ModelPolygon, gSmallWindow4, "SmallWindow4", 2);
 	PostProcessingVector.push_back(PPNM);
 }
 
@@ -844,12 +854,12 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	else if (postProcess == PostProcess::Bloom)
 	{
 		gD3DContext->PSSetShader(gBloomPostProcess, nullptr, 0);
-		
+
 	}
 	else if (postProcess == PostProcess::Merge)
 	{
 		gD3DContext->PSSetShaderResources(1, 1, &gMergeMapSRV);
-	    gD3DContext->PSSetShader(gMergePostProcess, nullptr, 0);
+		gD3DContext->PSSetShader(gMergePostProcess, nullptr, 0);
 		gD3DContext->PSSetSamplers(1, 1, &gTrilinearSampler);
 
 	}
@@ -857,7 +867,7 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 	{
 		gD3DContext->PSSetShader(gInversePostProcess, nullptr, 0);
 	}
-	else if (postProcess == PostProcess::Predator)
+	else if (postProcess == PostProcess::Scanlines)
 	{
 		gD3DContext->PSSetShader(gPredatorPostProcess, nullptr, 0);
 	}
@@ -909,7 +919,11 @@ void SelectPostProcessShaderAndTextures(PostProcess postProcess)
 		gPostProcessingConstants.tintColour2 = { PostProcessingDataVector[Counter].tint.rgbMid[0] ,PostProcessingDataVector[Counter].tint.rgbMid[1] ,PostProcessingDataVector[Counter].tint.rgbMid[2] };
 		gD3DContext->PSSetShader(gTintPostProcess, nullptr, 0);
 	}
-
+	else if (postProcess == PostProcess::Sigmoid)
+	{
+		gPostProcessingConstants.Gamma = PostProcessingDataVector[Counter].Sigmoid.Gamma;
+		gD3DContext->PSSetShader(gSigmoidPostProcess, nullptr, 0);
+	}
 	else if (postProcess == PostProcess::TintHue)
 	{
 
@@ -1135,7 +1149,7 @@ void AreaPostProcess(PostProcess postProcess, CVector3 worldPoint, CVector2 area
 
 
 // Perform an post process from "scene texture" to back buffer within the given four-point polygon and a world matrix to position/rotate/scale the polygon
-void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4> & points, const CMatrix4x4& worldMatrix)
+void PolygonPostProcess(PostProcess postProcess, const std::array<CVector3, 4>& points, const CMatrix4x4& worldMatrix)
 {
 	// First perform a full-screen copy of the scene to back-buffer
 	FullScreenPostProcess(PostProcess::Copy);
@@ -1247,14 +1261,17 @@ void RenderScene()
 	vp.TopLeftY = 0;
 	gD3DContext->RSSetViewports(1, &vp);
 
+
 	// Render the scene from the main camera
 	RenderSceneFromCamera(gCamera);
+	
 
 	////--------------- Main scene rendering ---------------////
 
 	// Set the target for rendering and select the main depth buffer.
 	// If using post-processing then render to the scene texture, otherwise to the usual back buffer
 	// Also clear the render target to a fixed colour and the depth buffer to the far distance
+
 	if (PostProcessingVector.size() != 0)
 	{
 		gD3DContext->OMSetRenderTargets(1, &gSceneRenderTarget, gDepthStencil);
@@ -1406,7 +1423,7 @@ void RenderScene()
 	ImGui::End();
 
 	ImGui::Begin("PostProcessingWindow", 0, ImGuiWindowFlags_AlwaysAutoResize);
-	if (ImGui::BeginMenu("PostProcessers"))
+	if (ImGui::BeginMenu("Add A Post Process"))
 	{
 		if (ImGui::Button("Tint", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::Tint;
@@ -1416,7 +1433,7 @@ void RenderScene()
 			PPD.tint.tint(tempTop, tempMid);
 			PostProcessingDataVector.push_back(PPD);
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("TintHue", ImVec2(100, 20)))
@@ -1428,21 +1445,30 @@ void RenderScene()
 			PPD.Hue.Hue(tempHue1, tempHue2);
 			PostProcessingDataVector.push_back({ PPD });
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Blur", ImVec2(100, 20)))
 		{
-			gCurrentPostProcess = PostProcess::Blur;
+
 			PostProcessData Blur;
 			PostProcessingData2 PPNM;
 			Blur.Blur.Blur(5);
+			gCurrentPostProcess = PostProcess::Blur;
 			PostProcessingDataVector.push_back(Blur);
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 2);
 			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::SecondBlur;
-			PostProcessingDataVector.push_back({ Blur });
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingDataVector.push_back({});
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 2);
+			PostProcessingVector.push_back(PPNM);
+		}
+		if (ImGui::Button("Sigmoid", ImVec2(100, 20)))
+		{
+			gCurrentPostProcess = PostProcess::Sigmoid;
+			PostProcessingDataVector.push_back({ 0.25 });
+			PostProcessingData2 PPNM;
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Bloom", ImVec2(100, 20)))
@@ -1451,21 +1477,21 @@ void RenderScene()
 			PostProcessData PPD;
 			gCurrentPostProcess = PostProcess::Bloom;
 			PostProcessingDataVector.push_back({});
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 4);
 			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::Blur;
 			PostProcessData Blur;
 			Blur.Blur.Blur(30);
 			PostProcessingDataVector.push_back(Blur);
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 4);
 			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::SecondBlur;
-			PostProcessingDataVector.push_back({ Blur });
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingDataVector.push_back({});
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 4);
 			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::Merge;
 			PostProcessingDataVector.push_back({});
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 4);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Burn", ImVec2(100, 20)))
@@ -1473,7 +1499,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Burn;
 			PostProcessingDataVector.push_back({ 1.0f });
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Inverse", ImVec2(100, 20)))
@@ -1481,7 +1507,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Inverse;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Distort", ImVec2(100, 20)))
@@ -1489,7 +1515,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Distort;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Spiral", ImVec2(100, 20)))
@@ -1497,7 +1523,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Spiral;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("HeatHaze", ImVec2(100, 20)))
@@ -1505,7 +1531,7 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::HeatHaze;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("GreyNoise", ImVec2(100, 20)))
@@ -1513,20 +1539,20 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::GreyNoise;
 			PostProcessingDataVector.push_back({ 140.0f });
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 
 		}
 		if (ImGui::Button("SeeingWorlds", ImVec2(100, 20)))
 		{
 			gCurrentPostProcess = PostProcess::SeeingWorlds;
-			PostProcessingDataVector.push_back({0.05});
+			PostProcessingDataVector.push_back({ 0.05 });
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 2);
 			PostProcessingVector.push_back(PPNM);
 			gCurrentPostProcess = PostProcess::SecondSeeingWorlds;
-			PostProcessingDataVector.push_back({0.05});
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PostProcessingDataVector.push_back({ 0.05 });
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 2);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Underwater", ImVec2(100, 20)))
@@ -1534,35 +1560,35 @@ void RenderScene()
 			gCurrentPostProcess = PostProcess::Underwater;
 			PostProcessingDataVector.push_back({ 1.0f });
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("NightVision", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::NightVision;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Pixelation", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::Pixelation;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
-		if (ImGui::Button("Predator", ImVec2(100, 20))) {
-			gCurrentPostProcess = PostProcess::Predator;
+		if (ImGui::Button("Scanlines", ImVec2(100, 20))) {
+			gCurrentPostProcess = PostProcess::Scanlines;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		if (ImGui::Button("Black&White", ImVec2(100, 20))) {
 			gCurrentPostProcess = PostProcess::BlackAndWhite;
 			PostProcessingDataVector.push_back({});
 			PostProcessingData2 PPNM;
-			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name);
+			PPNM.Set(gCurrentPostProcess, gCurrentPostProcessMode, ModelVector[Selected_Item].Mod, ModelVector[Selected_Item].Name, 1);
 			PostProcessingVector.push_back(PPNM);
 		}
 		ImGui::SameLine();
@@ -1589,6 +1615,216 @@ void RenderScene()
 				{
 					if (!Gloom)
 					{
+						if (ImGui::Button("Up", ImVec2(20, 20)))
+						{
+
+							if (PPNames[(int)PostProcessingVector[i].PP] == "Blur" || PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+							{
+								if (i - 1 >= 0)
+								{
+									if (PostProcessingVector[i - 1].NumberOfProcessors == 1)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 1]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 2]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i - 1]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i - 4], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i - 4], PostProcessingDataVector[i]);
+										std::swap(PostProcessingVector[i - 3], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i - 3], PostProcessingDataVector[i + 1]);
+										std::swap(PostProcessingVector[i - 2], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i - 2], PostProcessingDataVector[i]);
+										std::swap(PostProcessingVector[i - 1], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i - 1], PostProcessingDataVector[i + 1]);
+									}
+								}
+							}
+							else if (PPNames[(int)PostProcessingVector[i].PP] == "Bloom")
+							{
+								if (i - 1 >= 0)
+								{
+									if (PostProcessingVector[i - 1].NumberOfProcessors == 1)
+									{
+
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 1]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i + 1]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i + 2]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 2]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i - 1]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i + 1]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 4]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i - 3]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i - 3]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i - 2]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i - 2]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i - 1]);
+									}
+								}
+							}
+							else
+							{
+								if (i - 1 >= 0)
+								{
+									if (PostProcessingVector[i - 1].NumberOfProcessors == 1)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 1]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 2]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 1]);
+									}
+									else if (PostProcessingVector[i - 1].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 4]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 3]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 3]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 2]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i - 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i - 1]);
+									}
+								}
+							}
+						}
+						ImGui::SameLine();
+						if (ImGui::Button("Down", ImVec2(35, 20)))
+						{
+
+							if (PPNames[(int)PostProcessingVector[i].PP] == "Blur" || PPNames[(int)PostProcessingVector[i].PP] == "SeeingWorlds")
+							{
+								if (i + PostProcessingVector[i].NumberOfProcessors < PostProcessingVector.size())
+								{
+									if (PostProcessingVector[i + 2].NumberOfProcessors == 1)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 1]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 2]);
+									}
+									else if (PostProcessingVector[i + 2].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 2]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 3]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 3]);
+									}
+									else if (PostProcessingVector[i + 2].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 5]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 3]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i + 1]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i]);
+									}
+								}
+							}
+							else if (PPNames[(int)PostProcessingVector[i].PP] == "Bloom")
+							{
+								if (i + PostProcessingVector[i].NumberOfProcessors < PostProcessingVector.size())
+								{
+									if (PostProcessingVector[i + 4].NumberOfProcessors == 1)
+									{
+
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i + 4]);
+									}
+									else if (PostProcessingVector[i + 4].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 2]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 3]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 3]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 5]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 5]);
+									}
+									else if (PostProcessingVector[i + 4].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i + 1], PostProcessingVector[i + 5]);
+										std::swap(PostProcessingDataVector[i + 1], PostProcessingDataVector[i + 5]);
+										std::swap(PostProcessingVector[i + 2], PostProcessingVector[i + 6]);
+										std::swap(PostProcessingDataVector[i + 2], PostProcessingDataVector[i + 6]);
+										std::swap(PostProcessingVector[i + 3], PostProcessingVector[i + 7]);
+										std::swap(PostProcessingDataVector[i + 3], PostProcessingDataVector[i + 7]);
+									}
+								}
+							}
+							else
+							{
+								if (i + PostProcessingVector[i].NumberOfProcessors < PostProcessingVector.size())
+								{
+									if (PostProcessingVector[i + 1].NumberOfProcessors == 1)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 1]);
+									}
+									else if (PostProcessingVector[i + 1].NumberOfProcessors == 2)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 2]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 1]);
+									}
+									else if (PostProcessingVector[i + 1].NumberOfProcessors == 4)
+									{
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 4]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 4]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 3]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 3]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 2]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 2]);
+										std::swap(PostProcessingVector[i], PostProcessingVector[i + 1]);
+										std::swap(PostProcessingDataVector[i], PostProcessingDataVector[i + 1]);
+									}
+								}
+							}
+						}
+						ImGui::SameLine();
 						if (ImGui::Button("x", ImVec2(15, 20)))
 						{
 
@@ -1623,16 +1859,18 @@ void RenderScene()
 							break;
 						}
 						ImGui::SameLine();
+
+
 					}
 					else
 					{
 						Gloom = false;
 					}
 				}
-				
+
 			}
 		}
-		
+
 		ImGui::Text(PPNames[(int)PostProcessingVector[i].PP]);
 		ImGui::SameLine();
 		ImGui::Text("(");
@@ -1687,6 +1925,16 @@ void RenderScene()
 			{
 
 				ImGui::SliderInt("BlurStrength", &PostProcessingDataVector[i].Blur.blur, 1, 151);
+				ImGui::EndMenu();
+			}
+		}
+		if (PPNames[(int)PostProcessingVector[i].PP] == "Sigmoid")
+		{
+			ImGui::SameLine();
+			if (ImGui::BeginMenu("Sigmoid Properties"))
+			{
+
+				ImGui::SliderFloat("Gamma", &PostProcessingDataVector[i].Sigmoid.Gamma, 0.01, 0.4);
 				ImGui::EndMenu();
 			}
 		}
@@ -1772,8 +2020,9 @@ void UpdateScene(float frameTime)
 
 	gPostProcessingConstants.HueLevel += frameTime;
 
-
 	gPostProcessingConstants.WaterLevel += WaterSpeed * frameTime;
+
+
 
 	// Set the level of distortion
 	gPostProcessingConstants.distortLevel = 0.03f;

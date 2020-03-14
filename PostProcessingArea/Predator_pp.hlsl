@@ -43,29 +43,24 @@ float3 blend(const in float3 x, const in float3 y, const in float opacity)
 
 float4 main(PostProcessingInput input) : SV_Target
 {
-   // float3 tc = float3(1.0, 0.0, 0.0);
-   // float3 pixcol = SceneTexture.Sample(PointSample, input.sceneUV).rgb;
-   // float3 colors[3];
-   // colors[0] = float3(0., 0., 1.);
-   // colors[1] = float3(1., 1., 0.);
-   // colors[2] = float3(1., 0., 0.);
-   // float lum = (pixcol.r + pixcol.g + pixcol.b) / 3.;
-   // int ix = (lum < 0.5) ? 0 : 1;
-   // tc = lerp(colors[ix], colors[ix + 1], (lum - float(ix) * 0.5) / 0.5);
-   // 
-   // return float4(tc, 1.0);
     
         
     float density = 1.6;
     float opacityScanline = .9;
     float opacityNoise = .9;
     float flickering = 0.01;
+    const float EffectStrength = 0.02f;
     
+	
+	// Offset for scene texture UV based on haze effect
+	// Adjust size of UV offset based on the constant EffectStrength, the overall size of area being processed, and the alpha value calculated above
+    float SinY = sin(gHueLevel * 0.3);
     float3 col = SceneTexture.Sample(PointSample, input.sceneUV).rgb;
     
     float count = gViewportHeight * density;
-    float2 sl = float2(sin(input.sceneUV.y * count), cos(input.sceneUV.y * count));
+    float2 sl = float2(sin((input.sceneUV.y) * count), cos((input.sceneUV.y) * count));
     float3 scanlines = float3(sl.x, sl.y, sl.x);
+   
 
     col += col * scanlines * opacityScanline;
     col += col * float3(random(input.sceneUV * gHueLevel), random(input.sceneUV * gHueLevel), random(input.sceneUV * gHueLevel)) * opacityNoise;
@@ -73,7 +68,7 @@ float4 main(PostProcessingInput input) : SV_Target
     float grey = (col.r + col.g + col.b) / 3.0f;
 
 
-    return float4(grey, grey, grey, 1.0);
+    return float4(grey, grey, grey, 1.0) ;
   
 
 }

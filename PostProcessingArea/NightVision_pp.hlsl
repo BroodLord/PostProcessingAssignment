@@ -19,32 +19,27 @@ SamplerState PointSample : register(s0); // We don't usually want to filter (bil
 // Shader code
 //--------------------------------------------------------------------------------------
 
+
+
 // Post-processing shader that tints the scene texture to a given colour
 float4 main(PostProcessingInput input) : SV_Target
 {
-   float4 finalColor = SceneTexture.Sample(PointSample, input.sceneUV.xy);
-   float3 BasicColor = (0.1, 0.1, 0.1);
-   
-   finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
-   finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
-   finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
-   
-   if (finalColor.r + finalColor.g + finalColor.b > 1.2f)
-   {
-       finalColor = finalColor / 4;
-   }
-   finalColor.rgb += BasicColor;
-   finalColor.r = 0.0f;
-   finalColor.g = ((finalColor.r + finalColor.g + finalColor.b) / 3);
-   finalColor.b = 0.0f;
-   float3 color = SceneTexture.Sample(PointSample, input.sceneUV.xy) * finalColor;
-   return float4(color, 1.0f);
-
-    
-    
-    
-    
-    
-    
+  float4 finalColor = SceneTexture.Sample(PointSample, input.sceneUV.xy);
+  float3 BasicColor = (0.1, 0.1, 0.1);
+  
+  finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
+  finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
+  finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
+  
+  if (finalColor.r + finalColor.g + finalColor.b > 1.2f)
+  {
+      finalColor = finalColor / 4;
+  }
+  finalColor.rgb += BasicColor;
+  finalColor.r = 0.0f;
+  finalColor.g = ((finalColor.r + finalColor.g + finalColor.b) / 3);
+  finalColor.b = 0.0f;
+  float3 color = SceneTexture.Sample(PointSample, input.sceneUV.xy) * finalColor;
+  return float4(color, 1.0f);
 
 }

@@ -1,7 +1,8 @@
-﻿D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(26,25-32): warning X3081: comma expression used where a vector constructor may have been intended
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(26,25-37): warning X3081: comma expression used where a vector constructor may have been intended
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.hlsl(40,11-81): warning X3206: implicit truncation of vector type
+﻿D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(27,26-33): warning X3081: comma expression used where a vector constructor may have been intended
+  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.cso
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(27,26-38): warning X3081: comma expression used where a vector constructor may have been intended
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(38,27-36): warning X3081: comma expression used where a vector constructor may have been intended
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(38,27-42): warning X3081: comma expression used where a vector constructor may have been intended
+D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(43,12-82): warning X3206: implicit truncation of vector type
   
-  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\NightVision_pp.cso
-  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Predator_pp.cso
   PostProcessingArea.vcxproj -> D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe

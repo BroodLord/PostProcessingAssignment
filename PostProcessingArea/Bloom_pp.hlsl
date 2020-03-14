@@ -31,15 +31,15 @@ float4 main(PostProcessingInput input) : SV_Target
     //finalColor += SceneTexture.Sample(PointSample, input.sceneUV.xy);
     
 
-    float Brightness = finalColor.r + finalColor.g + finalColor.b / 3;
-    if (Brightness < 1.2f)
+    float Brightness = finalColor.r + finalColor.g + finalColor.b;
+    Brightness /= 3;
+    if (Brightness < 0.7f)
     {
-        finalColor.r = 0.0f;
-        finalColor.g = 0.0f;
-        finalColor.b = 0.0f;
+        finalColor.rgb = (0.0f, 0.0f, 0.0f);
+        //discard;
     }
     //finalColor.rgb += BasicColor;
 
-    //float3 color = SceneTexture.Sample(PointSample, input.sceneUV.xy) * finalColor;
+    float3 color = SceneTexture.Sample(PointSample, input.sceneUV.xy) * finalColor;
     return float4(finalColor.rgb, 1.0f);
 }

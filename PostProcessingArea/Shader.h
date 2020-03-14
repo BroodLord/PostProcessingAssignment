@@ -45,6 +45,7 @@ extern ID3D11PixelShader* gSeeingWorldsPostProcess;
 extern ID3D11PixelShader* gSecondSeeingWorldsPostProcess;
 extern ID3D11PixelShader* gBloomPostProcess;
 extern ID3D11PixelShader* gMergePostProcess;
+extern ID3D11PixelShader* gSigmoidPostProcess;
 
 
 

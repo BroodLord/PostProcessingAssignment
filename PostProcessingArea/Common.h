@@ -123,27 +123,26 @@ struct PostProcessingConstants
 
 	CVector3 tintColour1;
 	float    paddingB1;
+
 	CVector3 tintColour2;
 	float    paddingB2;
 
 	float HueLevel;
-	float paddingHL;
+	CVector3 paddingHL;
 
 	float ITime;
-	float paddingIT;
+	CVector3 paddingIT;
 
 	float OffSet;
-	float paddingOS;
+	CVector3 paddingOS;
+
+	float Gamma;
+	CVector3 paddingGamma;
 
 	int blurStrength;
-	float paddingBS;
-	//float paddingWA;
+	CVector3 paddingBS;
 
-	// Grey noise post-process settings
-    CVector2 noiseScale;
-	CVector2 noiseOffset;
-
-	// Burn post-process settings
+    // Burn post-process settings
 	float    burnHeight;
 	CVector3 paddingC;
 
@@ -161,6 +160,14 @@ struct PostProcessingConstants
 
 	float WaterLevel;
 	CVector3 paddingG;
+
+	// Grey noise post-process settings
+    CVector2 noiseScale;
+	CVector2 PaddingScale;
+
+	CVector2 noiseOffset;
+	CVector2 PaddingOffset;
+
 };
 extern PostProcessingConstants gPostProcessingConstants;      // This variable holds the CPU-side constant buffer described above
 extern ID3D11Buffer*           gPostProcessingConstantBuffer; // This variable controls the GPU-side constant buffer related to the above structure

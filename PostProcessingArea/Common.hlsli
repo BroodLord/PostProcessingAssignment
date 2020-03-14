@@ -133,47 +133,53 @@ cbuffer PostProcessingConstants : register(b1)
 
 	// Tint post-process settings
 	float3 gTintColour1;
-	float  paddingB1;
+    float paddingB1;
     // Tint post-process settings
     float3 gTintColour2;
     float paddingB2;
     // Tint post-process settings
 
     float gHueLevel;
-    float paddingHL;
+    float3 paddingHL;
     
     float gITime;
-    float gpaddingIT;
+    float3 gpaddingIT;
     
     float gOffSet;
-    float gpaddingOS;
+    float3 gpaddingOS;
+    
+    float gGamma;
+    float3 gpaddingGamma;
 
     int gblurStrength;
-    float paddingBS;
-
+    float3 paddingBS;
     
-	// Grey noise post-process settings
-    float2 gNoiseScale;
-	float2 gNoiseOffset;
-
-	// Burn post-process settings
-	float  gBurnHeight;
-	float3 paddingC;
+    // Burn post-process settings
+    float gBurnHeight;
+    float3 paddingC;
 
 	// Distort post-process settings
-	float  gDistortLevel;
-	float3 paddingD;
+    float gDistortLevel;
+    float3 paddingD;
 
 	// Spiral post-process settings
-	float  gSpiralLevel;
-	float3 paddingE;
+    float gSpiralLevel;
+    float3 paddingE;
 
 	// Heat haze post-process settings
-	float  gHeatHazeTimer;
-	float3 paddingF;
+    float gHeatHazeTimer;
+    float3 paddingF;
     
     float gWaterLevel;
     float3 paddingG;
+    
+	// Grey noise post-process settings
+    float2 gNoiseScale;
+    float2 PaddingScale;
+    
+    float2 gNoiseOffset;
+    float2 PaddingOffset;
+    
 }
 
 //**************************
