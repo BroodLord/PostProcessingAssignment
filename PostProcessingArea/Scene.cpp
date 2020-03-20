@@ -1417,6 +1417,12 @@ void RenderScene()
 		Selected_Screen = 0;
 		gCurrentPostProcessMode = PostProcessMode::Fullscreen;
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Polygon", ImVec2(130, 20)))
+	{
+		Selected_Screen = 2;
+		gCurrentPostProcessMode = PostProcessMode::Polygon;
+	}
 	ImGui::Text("Current Screen Mode: ");
 	ImGui::SameLine();
 	ImGui::Text(ModeNames[Selected_Screen]);

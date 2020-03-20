@@ -1,8 +1,9 @@
-﻿D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(27,26-33): warning X3081: comma expression used where a vector constructor may have been intended
-  compilation object save succeeded; see D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.cso
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(27,26-38): warning X3081: comma expression used where a vector constructor may have been intended
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(38,27-36): warning X3081: comma expression used where a vector constructor may have been intended
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(38,27-42): warning X3081: comma expression used where a vector constructor may have been intended
-D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\Bloom_pp.hlsl(43,12-82): warning X3206: implicit truncation of vector type
-  
-  PostProcessingArea.vcxproj -> D:\Users\DKavanagh2\Desktop\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe
+﻿  Scene.cpp
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(72,13): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(79,11): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(80,55): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(1555,47): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(1560,47): warning C4305: 'initializing': truncation from 'double' to 'float'
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(1943,86): warning C4305: 'argument': truncation from 'double' to 'float'
+C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\Scene.cpp(1483,20): warning C4101: 'PPD': unreferenced local variable
+  PostProcessingArea.vcxproj -> C:\Users\debbi\Documents\GitHub\PostProcessingAssignment\PostProcessingArea\\PostProcessingArea.exe
